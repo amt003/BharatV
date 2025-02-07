@@ -1,0 +1,360 @@
+<?php
+session_start();
+include 'db.php';
+
+// Check if user is logged in as admin
+if (!isset($_SESSION['name']) || $_SESSION['role'] !== 'admin') {
+    header("Location: login.php");
+    exit();
+}
+
+// Handle status updates
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_status'])) {
+    $reg_id = $_POST['reg_id'];
+    $new_status = $_POST['new_status'];
+    $user_type = $_POST['user_type'];
+    
+    // Convert status to boolean
+    $approved = ($new_status === 'true');
+    
+    $update_sql = "UPDATE users SET approved_by_admin = ? WHERE user_id = ?";
+    $stmt = $conn->prepare($update_sql);
+    $stmt->bind_param("ii", $approved, $reg_id);
+    
+    if ($stmt->execute()) {
+        $_SESSION['success_msg'] = "Status updated successfully";
+    } else {
+        $_SESSION['error_msg'] = "Error updating status: " . $conn->error;
+    }
+    
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
+}
+
+// Fetch registrations ordered by approval status
+$candidate_sql = "SELECT u.*, w.ward_name FROM users u 
+                 LEFT JOIN wards w ON u.ward_id = w.ward_id 
+                 WHERE u.role = 'candidate' 
+                 ORDER BY u.approved_by_admin ASC, u.user_id DESC";
+
+$voter_sql = "SELECT u.*, w.ward_name FROM users u 
+             LEFT JOIN wards w ON u.ward_id = w.ward_id 
+             WHERE u.role = 'voter' 
+             ORDER BY u.approved_by_admin ASC, u.user_id DESC";
+
+$candidates = $conn->query($candidate_sql);
+$voters = $conn->query($voter_sql);
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Approvals - BharatV</title>
+    <style>
+         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f5f7fa 100%);
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header img {
+            height: 60px;
+        }
+
+        .nav-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+        }
+
+        .nav-btn:hover {
+            background: #45a049;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .section-header h2 {
+            color: #333;
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .status-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100px;
+            text-align: center;
+        }
+
+        .approve-btn {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .reject-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .approve-btn:hover {
+            background-color: #218838;
+        }
+
+        .reject-btn:hover {
+            background-color: #c82333;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background-color: #ffeeba;
+            color: #856404;
+        }
+
+        .status-approved {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    
+
+    <div class="container">
+        <?php if (isset($_SESSION['success_msg'])): ?>
+            <div class="alert alert-success">
+                <?php 
+                    echo $_SESSION['success_msg'];
+                    unset($_SESSION['success_msg']);
+                ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($_SESSION['error_msg'])): ?>
+            <div class="alert alert-error">
+                <?php 
+                    echo $_SESSION['error_msg'];
+                    unset($_SESSION['error_msg']);
+                ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Candidate Approvals Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Candidate Registration Approvals</h2>
+            </div>
+            <div class="table-responsive">
+                <table border="1px">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhaar Number</th>
+                            <th>Document</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($candidate = $candidates->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($candidate['name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['email']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['aadhaar_number']); ?></td>
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($candidate['aadhaar_file']); ?>" 
+                                       class="document-link" target="_blank">
+                                        View Document
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="status-badge <?php echo $candidate['approved_by_admin'] ? 'status-approved' : 'status-pending'; ?>">
+                                        <?php echo $candidate['approved_by_admin'] ? 'Approved' : 'Pending'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <form method="POST" style="display: inline;">
+                                            <input type="hidden" name="reg_id" value="<?php echo $candidate['user_id']; ?>">
+                                            <input type="hidden" name="user_type" value="candidate">
+                                            <?php if (!$candidate['approved_by_admin']): ?>
+                                                <input type="hidden" name="new_status" value="true">
+                                                <button type="submit" name="update_status" class="status-button approve-btn">
+                                                    Approve
+                                                </button>
+                                            <?php else: ?>
+                                                <input type="hidden" name="new_status" value="false">
+                                                <button type="submit" name="update_status" class="status-button reject-btn">
+                                                    Reject
+                                                </button>
+                                            <?php endif; ?>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Voter Approvals Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2>Voter Registration Approvals</h2>
+            </div>
+            <div class="table-responsive">
+                <table border="1px  ">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhaar Number</th>
+                            <th>Document</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($voter = $voters->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($voter['name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['email']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['aadhaar_number']); ?></td>
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($voter['aadhaar_file']); ?>" 
+                                       class="document-link" target="_blank">
+                                        View Aadhaar_file
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="status-badge <?php echo $voter['approved_by_admin'] ? 'status-approved' : 'status-pending'; ?>">
+                                        <?php echo $voter['approved_by_admin'] ? 'Approved' : 'Pending'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <form method="POST" style="display: inline;">
+                                            <input type="hidden" name="reg_id" value="<?php echo $voter['user_id']; ?>">
+                                            <input type="hidden" name="user_type" value="voter">
+                                            <?php if (!$voter['approved_by_admin']): ?>
+                                                <input type="hidden" name="new_status" value="true">
+                                                <button type="submit" name="update_status" class="status-button approve-btn">
+                                                    Approve
+                                                </button>
+                                            <?php else: ?>
+                                                <input type="hidden" name="new_status" value="false">
+                                                <button type="submit" name="update_status" class="status-button reject-btn">
+                                                    Reject
+                                                </button>
+                                            <?php endif; ?>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Hide alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.getElementsByClassName('alert');
+            for(let alert of alerts) {
+                alert.style.display = 'none';
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
