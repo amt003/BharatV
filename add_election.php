@@ -135,6 +135,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_election'])) {
             border: 1px solid #f5c6cb;
         }
     </style>
+<script>
+    // Set today's date as default for start_date
+    window.onload = function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('start_date').value = today;
+        document.getElementById('end_date').value = today;
+    }
+</script>
 </head>
 <body>
     <div class="container">
@@ -193,5 +201,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_election'])) {
             </form>
         </div>
     </div>
+    <script>
+        // Add this inside a <script> tag before </body>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Set min attribute for both date inputs to today
+        document.getElementById('start_date').min = today;
+        document.getElementById('end_date').min = today;
+        
+        // Add event listeners to validate dates
+        document.getElementById('start_date').addEventListener('change', validateDates);
+        document.getElementById('end_date').addEventListener('change', validateDates);
+        
+        function validateDates() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            
+            if (startDate && endDate && endDate < startDate) {
+                alert('End date cannot be before start date!');
+                document.getElementById('end_date').value = startDate;
+            }
+        }
+    });
+    </script>
 </body>
 </html> 

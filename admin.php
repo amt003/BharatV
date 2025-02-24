@@ -204,25 +204,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
                 <i class="fas fa-vote-yea"></i>
                 <div class="stat-number">
                     <?php
-                    // $result = $conn->query("SELECT COUNT(*) as count FROM elections");
-                    // echo $result->fetch_assoc()['count'];
+                    $result = $conn->query("SELECT COUNT(*) as count FROM elections 
+                    WHERE CURDATE() >= start_date 
+                    AND CURDATE() <= end_date");
+                    echo $result->fetch_assoc()['count'];
                     ?>
                 </div>
                 <div class="stat-label">Active Elections</div>
             </div>
 
-            <div class="stat-card">
-                <i class="fas fa-chart-bar"></i>
-                <div class="stat-number">
-                    <?php
-                    // $result = $conn->query("SELECT COUNT(*) as count FROM votes");
-                    // echo $result->fetch_assoc()['count'];
-                    ?>
-                </div>
-                <div class="stat-label">Total Votes Cast</div>
-            </div>
-        </div>
-    </div>
+           
 
     <script>
         // Add active class to current page

@@ -18,7 +18,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "OTP has expired. Please register again.";
     } elseif ($entered_otp === $stored_data['otp']) {
         // Insert user into database
-        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role,aadhaar_number,aadhaar_file,address,phone,ward_id,dob,email_verified,approved_by_admin,admin_approval_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,0,null)");
+        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role,aadhaar_number,aadhaar_file,address,phone,ward_id,dob,email_verified,approved_by_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,0)");
         $stmt->bind_param("ssssssssss",     
             $stored_data['name'],
             $stored_data['email'],

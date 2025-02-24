@@ -19,7 +19,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $adminEmail = 'admin123@gmail.com';
             $adminPassword = 'admin12345';
 
-            if ($email === $adminEmail) {
+            if ($email === $adminEmail && $password===$adminPassword) {
       
                     $_SESSION['user_id'] = 1;
                     $_SESSION['name'] = $adminName;
@@ -142,10 +142,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             width: 100%;
             max-width: 500px;
             background: white;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.6);
             border-radius: 8px;
             overflow: hidden;
             padding: 30px;
+            animation: fadeIn 0.6s ease-out;
         }
 
         h1 {
@@ -225,8 +226,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .forgot-password-link {
             text-align: center;
             padding-top:10px;
+            color:green;
           
         }
+        @keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
     </style>
 </head>
 <body>
@@ -236,7 +250,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <div class="page-container">
         <div class="login-wrapper">
-            <h1>Login</h1>
+            <h1>Login To Your Account</h1>
             
             <?php if (isset($errors['login'])): ?>
                 <div class="error-message"><?php echo $errors['login']; ?></div>

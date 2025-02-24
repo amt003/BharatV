@@ -265,6 +265,7 @@ $conn->close();
             justify-content: center;
             flex-grow: 1;
             padding: 20px;
+
         }
 
         .form-wrapper {
@@ -274,6 +275,7 @@ $conn->close();
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
+            animation: fadeIn 0.6s ease-out;
         }
 
         .tabs {
@@ -359,6 +361,16 @@ $conn->close();
             margin: 25px;
             font-size: 0.85rem;
         }
+        @keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
     </style>
 </head>
 <body>
@@ -619,7 +631,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 <input type="hidden" name="form_type" value="candidate" />
 
                 <div class="form-group">
-                    <label for="name">Full Name *</label>
+                    <label for="name">Full Name*</label>
                     <input type="text" id="name" name="name" />
                     <?php if (isset($errors['name'])) : ?>
                         <div class="error"><?php echo $errors['name']; ?></div>
@@ -627,7 +639,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="dob">Date of Birth *</label>
+                    <label for="dob">Date of Birth*</label>
                     <input type="date" id="dob" name="dob" />
                     <?php if (isset($errors['dob'])) : ?>
                         <div class="error"><?php echo $errors['dob']; ?></div>
@@ -635,7 +647,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email Address *</label>
+                    <label for="email">Email Address*</label>
                     <input type="email" id="email" name="email" />
                     <?php if (isset($errors['email'])) : ?>
                         <div class="error"><?php echo $errors['email']; ?></div>
@@ -643,7 +655,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="phone">Phone Number *</label>
+                    <label for="phone">Phone Number*</label>
                     <input type="tel" id="phone" name="phone" />
                     <?php if (isset($errors['phone'])) : ?>
                         <div class="error"><?php echo $errors['phone']; ?></div>
@@ -651,7 +663,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="address">Address *</label>
+                    <label for="address">Address*</label>
                     <textarea id="address" name="address" rows="3"></textarea>
                     <?php if (isset($errors['address'])) : ?>
                         <div class="error"><?php echo $errors['address']; ?></div>
@@ -659,7 +671,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-    <label for="ward_id">Ward *</label>
+    <label for="ward_id">Ward*</label>
     <select id="ward_id" name="ward_id">
         <option value="">Select</option>
         <?php foreach($wards as $ward): ?>
@@ -675,7 +687,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
 
 
                 <div class="form-group">
-                    <label for="aadhaar_number">Aadhaar Number *</label>
+                    <label for="aadhaar_number">Aadhaar Number*</label>
                     <input type="text" id="aadhaar_number" name="aadhaar_number" maxlength="12" />
                     <?php if (isset($errors['aadhaar_number'])) : ?>
                         <div class="error"><?php echo $errors['aadhaar_number']; ?></div>
@@ -683,7 +695,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="aadhaar_file">Aadhaar File *</label>
+                    <label for="aadhaar_file">Aadhaar Proof *</label>
                     <input type="file" id="aadhaar_file" name="aadhaar_file" />
                     <?php if (isset($errors['aadhaar_file'])) : ?>
                         <div class="error"><?php echo $errors['aadhaar_file']; ?></div>
@@ -691,7 +703,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password *</label>
+                    <label for="password">Password*</label>
                     <input type="password" id="password" name="password" />
                     <?php if (isset($errors['password'])) : ?>
                         <div class="error"><?php echo $errors['password']; ?></div>
@@ -699,7 +711,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 </div>
 
                 <div class="form-group">
-                    <label for="confirm_password">Confirm Password *</label>
+                    <label for="confirm_password">Confirm Password*</label>
                     <input type="password" id="confirm_password" name="confirm_password" />
                     <?php if (isset($errors['confirm_password'])) : ?>
                         <div class="error"><?php echo $errors['confirm_password']; ?></div>
@@ -718,7 +730,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
         <input type="hidden" name="form_type" value="voter" />
 
         <div class="form-group">
-          <label for="name">Full Name *</label>
+          <label for="name">Full Name*</label>
           <input type="text" id="name" name="name" />
           <?php if (isset($errors['name'])) : ?>
           <div class="error"><?php echo $errors['name']; ?></div>
@@ -726,7 +738,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
         </div>
 
         <div class="form-group">
-        <label for="dob">Date of Birth *</label>
+        <label for="dob">Date of Birth*</label>
         <input type="date" id="dob" name="dob" />
         <?php if (isset($errors['dob'])) : ?>
         <div class="error"><?php echo $errors['dob']; ?></div>
@@ -734,7 +746,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
         </div>
 
         <div class="form-group">
-          <label for="email">Email Address *</label>
+          <label for="email">Email Address*</label>
           <input type="email" id="email" name="email" />
           <?php if (isset($errors['email'])) : ?>
           <div class="error"><?php echo $errors['email']; ?></div>
@@ -742,7 +754,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
         </div>
 
         <div class="form-group">
-          <label for="phone">Phone Number *</label>
+          <label for="phone">Phone Number*</label>
           <input type="tel" id="phone" name="phone" />
           <?php if (isset($errors['phone'])) : ?>
           <div class="error"><?php echo $errors['phone']; ?></div>
@@ -750,14 +762,14 @@ document.querySelector('form').addEventListener('submit', function(e) {
         </div>
 
         <div class="form-group">
-          <label for="address">Address *</label>
+          <label for="address">Address*</label>
           <textarea id="address" name="address" rows="3"></textarea>
           <?php if (isset($errors['address'])) : ?>
           <div class="error"><?php echo $errors['address']; ?></div>
           <?php endif; ?>
         </div>
         <div class="form-group">
-    <label for="ward_id">Ward *</label>
+    <label for="ward_id">Ward*</label>
     <select id="ward_id" name="ward_id">
         <option value="">Select</option>
         <?php foreach($wards as $ward): ?>
@@ -771,9 +783,8 @@ document.querySelector('form').addEventListener('submit', function(e) {
     <?php endif; ?>
 </div>
 
-
         <div class="form-group">
-          <label for="aadhaar_number">Aadhar Number *</label>
+          <label for="aadhaar_number">Aadhaar Number*</label>
           <input type="text" id="aadhaar_number" name="aadhaar_number" maxlength="12" />
           <?php if (isset($errors['aadhaar_number'])) : ?>
           <div class="error"><?php echo $errors['aadhaar_number']; ?></div>
@@ -781,7 +792,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
         </div>
 
         <div class="form-group">
-          <label for="aadhaar_file">Adhaar File *</label>
+          <label for="aadhaar_file">Aadhaar Proof*</label>
           <input type="file" id="aadhaar_file" name="aadhaar_file" class="file-input" />
           <?php if (isset($errors['aadhaar_file'])) : ?>
           <div class="error"><?php echo $errors['aadhaar_file']; ?></div>

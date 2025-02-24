@@ -226,11 +226,11 @@ if (!isset($_SESSION['name'])) {
                 <p>Voting Made Simple</p>
             </div>
             <div class="nav-menu">
-                <button onclick="loadContent('voter-profile')">Profile</button>
-                <button onclick="loadContent('election')">Election Update</button>
+                <button onclick="loadContent('voter_profile')">Profile</button>
+                <button onclick="loadContent('election_updates')">Election Update</button>
                 <button onclick="loadContent('vote')">Vote Now</button>
                 <button onclick="loadContent('results')">View results</button>
-                <button onclick="loadContent('candidates')">View Candidates</button>
+                
             </div>
             <div class="sidebar-logout">
                 <button onclick="logout()">Logout</button>
@@ -252,23 +252,73 @@ if (!isset($_SESSION['name'])) {
     </div>
 
     <script>
-        function loadContent(page) {
-            fetch(`pages/${page}.php`)
+         function loadContent(page, electionId = null) {
+    let url = `${page}.php`;
+    
+    // If it's the fetch_candidates page and no electionId is provided, 
+    // show a message asking to select an election first
+    if (page === 'fetch_candidates' && !electionId) {
+        document.getElementById('dynamicContent').innerHTML = `
+            <h2>View Candidates</h2>
+            <p>Please select an election from the Election Updates page to view its candidates.</p>`;
+        return;
+    }
+
+    // Append election ID if provided
+    if (electionId) {
+        url += `?election_id=${electionId}`;
+    }
+
+    fetch(url)
+        .then(response => response.text())
+        .then(data => {
+            document.getElementById('dynamicContent').innerHTML = data;
+        })
+        .catch(error => {
+            console.error('Error loading content:', error);
+        });
+}
+
+            function logout() {
+                fetch('logout.php')
+                    .then(() => {
+                        window.location.href = 'login.php';
+                    });
+            }
+        //modal    
+        document.addEventListener("DOMContentLoaded", function () {
+            document.body.addEventListener("click", function (event) {
+                if (event.target.classList.contains("view-candidates-button")) {
+                    let electionId = event.target.getAttribute("data-election-id");
+                    openCandidateModal(electionId);
+                }
+            });
+        });
+
+        function openCandidateModal(electionId) {
+            let modal = document.getElementById("candidateModal");
+            let modalContent = document.getElementById("modalContent");
+
+            fetch(`fetch_candidates.php?election_id=${electionId}`)
                 .then(response => response.text())
                 .then(data => {
-                    document.getElementById('dynamicContent').innerHTML = data;
+                    modalContent.innerHTML = data;
+                    modal.style.display = "flex"; // Show modal
                 })
-                .catch(error => {
-                    console.error('Error loading content:', error);
-                });
+                .catch(error => console.error('Error fetching candidates:', error));
         }
 
-        function logout() {
-            fetch('logout.php')
-                .then(() => {
-                    window.location.href = 'login.php';
-                });
+        function closeModal() {
+            document.getElementById("candidateModal").style.display = "none";
         }
     </script>
+    <div id="candidateModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div id="modalContent">
+            <!-- Candidate details will be loaded here -->
+        </div>
+    </div>
+</div>
 </body>
 </html>

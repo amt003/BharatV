@@ -16,9 +16,12 @@ $stmt->execute();
 $party_result = $stmt->get_result();
 $party_data = $party_result->fetch_assoc();
 
-// Get all wards
-$wards_query = "SELECT * FROM wards ORDER BY ward_id";
-$wards_result = $conn->query($wards_query);
+//get all active elections
+$elections_query = "SELECT election_id, Election_title, start_date, end_date, status, ward_ids 
+                   FROM elections 
+                   WHERE status = 'scheduled' 
+                   ORDER BY start_date DESC";
+$elections_result = $conn->query($elections_query);
 
 ?>
 
@@ -255,6 +258,57 @@ $wards_result = $conn->query($wards_query);
             flex: 1;
             color: #333;
         }
+        .election-section {
+            margin-bottom: 40px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .election-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .election-title {
+            font-size: 22px;
+            color: #333;
+        }
+
+        .election-meta {
+            display: flex;
+            gap: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .election-date {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .election-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+
+        .status-scheduled {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status-ongoing {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
 
         @media (max-width: 768px) {
             .wards-container {
@@ -285,67 +339,110 @@ $wards_result = $conn->query($wards_query);
             <a href="logout.php" class="logout-btn">Logout</a>
         </div>
 
-        <div class="wards-container">
-            <?php while($ward = $wards_result->fetch_assoc()): ?>
-                <div class="ward-card">
-                    <div class="ward-header">
-                        <h2>Ward <?php echo $ward['ward_id']; ?> - <?php echo htmlspecialchars($ward['ward_name']); ?></h2>
-                    </div>
-
-                    <?php
-                    // Get candidates for this ward and party
-                    $stmt = $conn->prepare("
-                        SELECT c.*, u.name, u.phone, u.email 
-                        FROM candidate_applications c 
-                        JOIN users u ON c.user_id = u.user_id 
-                        WHERE c.ward_id = ? AND c.party_id = ?
-                        ORDER BY c.application_date DESC
-                    ");
-                    $stmt->bind_param("ii", $ward['ward_id'], $party_id);
-                    $stmt->execute();
-                    $candidates = $stmt->get_result();
-                    ?>
-
-                    <ul class="candidate-list">
-                        <?php if($candidates->num_rows > 0): ?>
-                            <?php while($candidate = $candidates->fetch_assoc()): ?>
-                                <li class="candidate-item">
-                                    <div class="candidate-info">
-                                        <div class="candidate-name">
-                                            <?php echo htmlspecialchars($candidate['name']); ?>
-                                        </div>
-                                        <div class="candidate-details">
-                                            <i class="fas fa-phone"></i> <?php echo htmlspecialchars($candidate['phone']); ?>
-                                            <br>
-                                            <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($candidate['email']); ?>
-                                        </div>
-                                        <span class="status-badge status-<?php echo $candidate['status']; ?>">
-                                            <?php echo ucfirst($candidate['status']); ?>
-                                        </span>
-                                    </div>
-                                    <div class="action-buttons">
-                                        <button class="action-btn view-btn" onclick="viewCandidate(<?php echo $candidate['application_id']; ?>)">
-                                            <i class="fas fa-eye"></i> View Details
-                                        </button>
-                                        <?php if($candidate['status'] === 'pending'): ?>
-                                            <button class="action-btn approve-btn" onclick="updateStatus(<?php echo $candidate['application_id']; ?>, 'approved')">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                            <button class="action-btn reject-btn" onclick="updateStatus(<?php echo $candidate['application_id']; ?>, 'rejected')">
-                                                <i class="fas fa-times"></i> Reject
-                                            </button>
-                                        <?php endif; ?>
-                                    </div>
-                                </li>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <li class="no-candidates">No applications for this ward</li>
-                        <?php endif; ?>
-                    </ul>
+        <?php while($election = $elections_result->fetch_assoc()): ?>
+    <div class="election-section">
+        <div class="election-header">
+            <div class="election-title">
+                <?php echo htmlspecialchars($election['Election_title']); ?>
+            </div>
+            <div class="election-meta">
+                <div class="election-date">
+                    <i class="fas fa-calendar"></i>
+                    <?php echo date('M d, Y', strtotime($election['start_date'])); ?> - 
+                    <?php echo date('M d, Y', strtotime($election['end_date'])); ?>
                 </div>
-            <?php endwhile; ?>
+                <div class="election-status status-<?php echo $election['status']; ?>">
+                    <?php echo ucfirst($election['status']); ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="wards-container">
+            <?php
+            if (isset($election['ward_ids']) && !empty($election['ward_ids'])) {
+                $ward_ids = array_map('intval', explode(',', $election['ward_ids']));
+                $ward_ids = array_filter($ward_ids);
+                
+                if (!empty($ward_ids)) {
+                    $ward_ids_string = implode(',', $ward_ids);
+                    $wards_query = "SELECT * FROM wards WHERE ward_id IN ($ward_ids_string) ORDER BY ward_id";
+                    $wards_result = $conn->query($wards_query);
+                    
+                    if ($wards_result && $wards_result->num_rows > 0) {
+                        while($ward = $wards_result->fetch_assoc()) {
+                            // Get candidates for this ward
+                            $stmt = $conn->prepare("
+                                SELECT c.*, u.name, u.phone, u.email 
+                                FROM candidate_applications c 
+                                JOIN users u ON c.id = u.id  
+                                WHERE c.ward_id = ? 
+                                AND c.party_id = ? 
+                                AND c.election_id = ?
+                                ORDER BY c.created_at DESC
+                            ");
+                            
+                            $stmt->bind_param("iii", $ward['ward_id'], $party_id, $election['election_id']);
+                            $stmt->execute();
+                            $candidates = $stmt->get_result();
+                            ?>
+                            
+                            <div class="ward-card">
+                                <div class="ward-header">
+                                    <h2>Ward <?php echo $ward['ward_id']; ?> - <?php echo htmlspecialchars($ward['ward_name']); ?></h2>
+                                </div>
+
+                                <ul class="candidate-list">
+                                    <?php if($candidates->num_rows > 0): ?>
+                                        <?php while($candidate = $candidates->fetch_assoc()): ?>
+                                            <li class="candidate-item">
+                                                <div class="candidate-info">
+                                                    <div class="candidate-name">
+                                                        <?php echo htmlspecialchars($candidate['name']); ?>
+                                                    </div>
+                                                    <div class="candidate-details">
+                                                        <i class="fas fa-phone"></i> <?php echo htmlspecialchars($candidate['phone']); ?>
+                                                        <br>
+                                                        <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($candidate['email']); ?>
+                                                    </div>
+                                                    <span class="status-badge status-<?php echo $candidate['application_status']; ?>">
+                                                        <?php echo ucfirst($candidate['application_status']); ?>
+                                                    </span>
+                                                </div>
+                                                <div class="action-buttons">
+                                                    <button class="action-btn view-btn" onclick="viewCandidate(<?php echo $candidate['application_id']; ?>)">
+                                                        <i class="fas fa-eye"></i> View Details
+                                                    </button>
+                                                    <?php if($candidate['application_status'] === 'pending'): ?>
+                                                        <button class="action-btn approve-btn" onclick="updateStatus(<?php echo $candidate['application_id']; ?>, 'approved')">
+                                                            <i class="fas fa-check"></i> Approve
+                                                        </button>
+                                                        <button class="action-btn reject-btn" onclick="updateStatus(<?php echo $candidate['application_id']; ?>, 'rejected')">
+                                                            <i class="fas fa-times"></i> Reject
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </li>
+                                        <?php endwhile; ?>
+                                    <?php else: ?>
+                                        <li class="no-candidates">No applications for this ward</li>
+                                    <?php endif; ?>
+                                </ul>
+                            </div>
+                            <?php
+                        }
+                    } else {
+                        echo "<div class='no-candidates'>No wards found for this election</div>";
+                    }
+                } else {
+                    echo "<div class='no-candidates'>Invalid ward IDs for this election</div>";
+                }
+            } else {
+                echo "<div class='no-candidates'>No wards assigned to this election</div>";
+            }
+            ?>
         </div>
     </div>
+<?php endwhile; ?>
 
     <!-- Candidate Details Modal -->
     <div id="candidateModal" class="modal">
@@ -359,74 +456,93 @@ $wards_result = $conn->query($wards_query);
     </div>
 
     <script>
-        // View candidate details
-        function viewCandidate(applicationId) {
-            const modal = document.getElementById('candidateModal');
-            const detailsContainer = document.getElementById('candidateDetails');
-            
-            // Fetch candidate details
-            fetch(`get_candidate_details.php?application_id=${applicationId}`)
-                .then(response => response.json())
-                .then(data => {
-                    detailsContainer.innerHTML = `
-                        <div class="detail-row">
-                            <span class="detail-label">Name:</span>
-                            <span class="detail-value">${data.name}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Age:</span>
-                            <span class="detail-value">${data.age}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Phone:</span>
-                            <span class="detail-value">${data.phone}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Education:</span>
-                            <span class="detail-value">${data.education}</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Experience:</span>
-                            <span class="detail-value">${data.experience} years</span>
-                        </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Address:</span>
-                            <span class="detail-value">${data.address}</span>
-                        </div>
-                    `;
-                    modal.style.display = 'block';
-                })
-                .catch(error => console.error('Error:', error));
-        }
+       function viewCandidate(applicationId) {
+    const modal = document.getElementById('candidateModal');
+    const detailsContainer = document.getElementById('candidateDetails');
+    
+    // Show loading state
+    detailsContainer.innerHTML = '<p>Loading...</p>';
+    modal.style.display = 'block';
+    
+    // Fetch candidate details
+    fetch(`get_candidate_details.php?application_id=${applicationId}`)
+        .then(response => response.json())
+        .then(data => {
+            detailsContainer.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Name:</span>
+                    <span class="detail-value">${data.name}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Age:</span>
+                    <span class="detail-value">${data.age}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Phone:</span>
+                    <span class="detail-value">${data.phone}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Email:</span>
+                    <span class="detail-value">${data.email}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Education:</span>
+                    <span class="detail-value">${data.education}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Political Experience:</span>
+                    <span class="detail-value">${data.experience} years</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Address:</span>
+                    <span class="detail-value">${data.address}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Profile Photo:</span>
+                    <img src="${data.profile_photo}" alt="Profile Photo" style="width: 100px; height: 100px; border-radius: 10px;">
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Aadhar Proof:</span>
+                    <a href="${data.aadhar_proof}" target="_blank">View Aadhar Proof</a>
+                </div>
+            `;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            detailsContainer.innerHTML = '<p class="error">Failed to load candidate details.</p>';
+        });
+}
 
-        // Update application status
-        function updateStatus(applicationId, status) {
-            if(confirm(`Are you sure you want to ${status} this application?`)) {
-                fetch('update_application_status.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        application_id: applicationId,
-                        status: status
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if(data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error updating status');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error processing request');
-                });
+ // Update application status
+ function updateStatus(applicationId, status) {
+    console.log('Updating status:', { applicationId, status }); // Add this line
+    
+    if(confirm(`Are you sure you want to ${status} this application?`)) {
+        fetch('update_application_status.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                application_id: applicationId,
+                status: status
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Response:', data); // Add this line
+            if(data.success) {
+                location.reload();
+            } else {
+                alert('Error updating status: ' + data.message); // Modified to show error message
             }
-        }
-
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error processing request');
+        });
+    }
+}
         // Close modal
         document.querySelector('.close-btn').onclick = function() {
             document.getElementById('candidateModal').style.display = 'none';

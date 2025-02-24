@@ -1,309 +1,592 @@
 <?php
 session_start();
 require_once 'db.php';
-require_once('tcpdf/tcpdf.php');
 
-if (!isset($_SESSION['name'])) {
-    header("Location: login.php");
+$message = '';
+$messageType = '';
+
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'candidate') {
+    header('Location: login.php');
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Handle photo upload
-    $photo = file_get_contents($_FILES['profile_photo']['tmp_name']);
-    $aadhar = file_get_contents($_FILES['aadhar_proof']['tmp_name']);
-    
-    // Generate PDF
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-    $pdf->SetCreator('Election System');
-    $pdf->SetTitle('Candidate Application');
-    $pdf->AddPage();
-    
-    // Add content to PDF
-    $pdf->SetFont('helvetica', 'B', 16);
-    $pdf->Cell(0, 10, 'Candidate Application Form', 0, 1, 'C');
-    
-    $pdf->SetFont('helvetica', '', 12);
-    
-    // Add photo
-    $pdf->Image('@'.$photo, 160, 15, 30, 40, '', '', '', false, 300, '', false, false, 1);
-    
-    // Personal Information
-    $pdf->SetFont('helvetica', 'B', 12);
-    $pdf->Cell(0, 10, 'Personal Information', 0, 1, 'L');
-    $pdf->SetFont('helvetica', '', 12);
-    
-    $pdf->Cell(50, 7, 'Name:', 0, 0);
-    $pdf->Cell(0, 7, $_POST['full_name'], 0, 1);
-    
-    $pdf->Cell(50, 7, 'Age:', 0, 0);
-    $pdf->Cell(0, 7, $_POST['age'], 0, 1);
-    
-    $pdf->Cell(50, 7, 'Address:', 0, 0);
-    $pdf->MultiCell(0, 7, $_POST['address'], 0, 'L');
-    
-    $pdf->Cell(50, 7, 'Phone:', 0, 0);
-    $pdf->Cell(0, 7, $_POST['phone'], 0, 1);
-    
-    // Education & Experience
-    $pdf->Ln(5);
-    $pdf->SetFont('helvetica', 'B', 12);
-    $pdf->Cell(0, 10, 'Education and Experience', 0, 1, 'L');
-    $pdf->SetFont('helvetica', '', 12);
-    
-    $pdf->Cell(50, 7, 'Education:', 0, 0);
-    $pdf->MultiCell(0, 7, $_POST['education'], 0, 'L');
-    
-    $pdf->Cell(50, 7, 'Occupation:', 0, 0);
-    $pdf->Cell(0, 7, $_POST['occupation'], 0, 1);
-    
-    $pdf->Cell(50, 7, 'Political Experience:', 0, 0);
-    $pdf->MultiCell(0, 7, $_POST['political_experience'], 0, 'L');
-    
-    // Add Aadhar proof
-    $pdf->AddPage();
-    $pdf->SetFont('helvetica', 'B', 12);
-    $pdf->Cell(0, 10, 'Identity Proof (Aadhar)', 0, 1, 'L');
-    $pdf->Image('@'.$aadhar, 15, 50, 180, 0, '', '', '', false, 300);
-    
-    // Save PDF to string
-    $pdf_content = $pdf->Output('', 'S');
-    
-    // Store in database
-    $stmt = $conn->prepare("INSERT INTO candidate_applications (user_id, party_id, ward_id, application_form,application_status,submitted_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
-    $stmt->bind_param("iiis", $_SESSION['user_id'], $_POST['party_id'], $_POST['ward_id'], $pdf_content);
-    
-    if ($stmt->execute()) {
-        $success = "Application submitted successfully";
-    } else {
-        $error = "Error submitting application";
+$user_id = $_SESSION['user_id'];
+
+// Fetch the candidate's ward
+$wardQuery = $conn->prepare("SELECT ward_id FROM users WHERE id = ?");
+$wardQuery->bind_param("i", $user_id);
+$wardQuery->execute();
+$wardResult = $wardQuery->get_result();
+$ward = $ward_id = $wardResult->fetch_assoc()['ward_id'];
+
+// Check if candidate is contesting in any ongoing election (both regular and independent)
+$checkContestingQuery = $conn->prepare("
+    SELECT 
+        CASE 
+            WHEN cc.independent_party_name IS NOT NULL THEN 'independent'
+            ELSE 'regular'
+        END as candidate_type,
+        e.election_title,
+        e.status
+    FROM (
+        -- Get independent candidates
+        SELECT id, election_id, independent_party_name
+        FROM contesting_candidates 
+        WHERE id = ? AND independent_party_name IS NOT NULL
+        
+        UNION
+        
+        -- Get regular candidates with approved applications
+        SELECT ca.id, ca.election_id, NULL as independent_party_name
+        FROM candidate_applications ca
+        WHERE ca.id = ? AND ca.application_status = 'approved'
+    ) cc
+    JOIN elections e ON cc.election_id = e.election_id 
+    WHERE e.status != 'completed'
+");
+
+$checkContestingQuery->bind_param("ii", $user_id, $user_id);
+$checkContestingQuery->execute();
+$contestingResult = $checkContestingQuery->get_result();
+
+$isContesting = false;
+$contestingDetails = null;
+
+if ($contestingResult->num_rows > 0) {
+    $isContesting = true;
+    $contestingDetails = $contestingResult->fetch_assoc();
+}
+
+// Check for pending applications
+$checkPendingQuery = $conn->prepare("
+    SELECT election_title 
+    FROM candidate_applications ca
+    JOIN elections e ON ca.election_id = e.election_id
+    WHERE ca.id = ? AND ca.application_status = 'pending'
+");
+$checkPendingQuery->bind_param("i", $user_id);
+$checkPendingQuery->execute();
+$pendingResult = $checkPendingQuery->get_result();
+$hasPendingApplication = $pendingResult->num_rows > 0;
+
+if ($hasPendingApplication) {
+    $pendingDetails = $pendingResult->fetch_assoc();
+    $message = "You have a pending application for the election: " . 
+               htmlspecialchars($pendingDetails['election_title']) . 
+               ". Please wait for it to be processed.";
+    $messageType = "error";
+} elseif ($isContesting) {
+    $message = "You are currently contesting as a " . 
+               ($contestingDetails['candidate_type'] === 'independent' ? 'an independent' : 'a party-affiliated') . 
+               " candidate in the election: " . htmlspecialchars($contestingDetails['election_title']) . 
+               ". You cannot submit new applications until this election is completed.";
+    $messageType = "error";
+}
+
+// Fetch available elections only if candidate can apply
+if (!$isContesting && !$hasPendingApplication) {
+    $electionsQuery = $conn->prepare("
+        SELECT election_id, election_title 
+        FROM elections 
+        WHERE FIND_IN_SET(?, ward_ids) 
+        AND status != 'completed'
+        AND election_id NOT IN (
+            -- Exclude elections where candidate already applied/contesting
+            SELECT election_id FROM candidate_applications WHERE id = ?
+            UNION
+            SELECT election_id FROM contesting_candidates WHERE id = ?
+        )
+    ");
+    $electionsQuery->bind_param("iii", $ward_id, $user_id, $user_id);
+    $electionsQuery->execute();
+    $electionsResult = $electionsQuery->get_result();
+}
+
+// Process form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        // Check again for existing applications
+        $checkExistingQuery = $conn->prepare("SELECT COUNT(*) as count FROM candidate_applications 
+        WHERE id = ? AND application_status IN ('pending', 'approved')");
+        $checkExistingQuery->bind_param("i", $user_id);
+        $checkExistingQuery->execute();
+        $existingResult = $checkExistingQuery->get_result()->fetch_assoc();
+
+        if ($existingResult['count'] > 0) {
+            throw new Exception("You already have a pending or approved application. Please wait for it to be processed.");
+        }
+
+        // Validate required fields
+        $required_fields = ['full_name', 'age', 'phone', 'education', 'address', 
+                          'occupation', 'ward_id', 'party_id', 'election_id'];
+        
+        // Add independent party fields if independent party is selected
+        if ($_POST['party_id'] == 'independent') {
+            $required_fields[] = 'independent_party_name';
+        }
+        
+        foreach ($required_fields as $field) {
+            if (empty($_POST[$field])) {
+                throw new Exception("All fields are required. Please fill in {$field}.");
+            }
+        }
+
+        // Validate age
+        if ($_POST['age'] < 25) {
+            throw new Exception("Age must be at least 25 years.");
+        }
+
+        // Validate phone number
+        if (!preg_match("/^[6789]\d{9}$/", $_POST['phone'])) {
+            throw new Exception("Please enter a valid 10-digit phone number.");
+        }
+
+        // Handle file uploads
+        $profile_photo = '';
+        $aadhar_proof = '';
+        $independent_party_symbol = '';
+
+        // Profile Photo Upload
+        if (!isset($_FILES['profile_photo']) || $_FILES['profile_photo']['error'] !== 0) {
+            throw new Exception("Profile photo is required.");
+        }
+
+        $allowed_image_types = ['image/jpeg', 'image/png', 'image/gif'];
+        if (!in_array($_FILES['profile_photo']['type'], $allowed_image_types)) {
+            throw new Exception("Invalid profile photo format. Please upload JPG, PNG, or GIF.");
+        }
+
+        $target_dir = "uploads/profile_photos/";
+        if (!file_exists($target_dir)) {
+            mkdir($target_dir, 0777, true);
+        }
+        $profile_photo = $target_dir . uniqid() . '_' . basename($_FILES['profile_photo']['name']);
+        if (!move_uploaded_file($_FILES['profile_photo']['tmp_name'], $profile_photo)) {
+            throw new Exception("Failed to upload profile photo.");
+        }
+
+        // Independent Party Symbol Upload (if independent)
+        if ($_POST['party_id'] == 'independent') {
+            if (!isset($_FILES['independent_party_symbol']) || $_FILES['independent_party_symbol']['error'] !== 0) {
+                throw new Exception("Party symbol is required for independent candidates.");
+            }
+
+            if (!in_array($_FILES['independent_party_symbol']['type'], $allowed_image_types)) {
+                throw new Exception("Invalid party symbol format. Please upload JPG, PNG, or GIF.");
+            }
+
+            $target_dir = "uploads/party_symbols/";
+            if (!file_exists($target_dir)) {
+                mkdir($target_dir, 0777, true);
+            }
+            $independent_party_symbol = $target_dir . uniqid() . '_' . basename($_FILES['independent_party_symbol']['name']);
+            if (!move_uploaded_file($_FILES['independent_party_symbol']['tmp_name'], $independent_party_symbol)) {
+                throw new Exception("Failed to upload party symbol.");
+            }
+        }
+
+        // Aadhar Proof Upload
+        if (!isset($_FILES['aadhar_proof']) || $_FILES['aadhar_proof']['error'] !== 0) {
+            throw new Exception("Aadhar proof is required.");
+        }
+
+        if ($_FILES['aadhar_proof']['type'] !== 'application/pdf') {
+            throw new Exception("Invalid Aadhar proof format. Please upload PDF only.");
+        }
+
+        $target_dir = "uploads/aadhar_proofs/";
+        if (!file_exists($target_dir)) {
+            mkdir($target_dir, 0777, true);
+        }
+        $aadhar_proof = $target_dir . uniqid() . '_' . basename($_FILES['aadhar_proof']['name']);
+        if (!move_uploaded_file($_FILES['aadhar_proof']['tmp_name'], $aadhar_proof)) {
+            throw new Exception("Failed to upload Aadhar proof.");
+        }
+
+        // Begin transaction
+        $conn->begin_transaction();
+
+        // Check if candidate has already applied for this election
+        $check_query = $conn->prepare("SELECT COUNT(*) as count FROM candidate_applications 
+                                     WHERE id = ? AND election_id = ?");
+        $check_query->bind_param("ii", $user_id, $_POST['election_id']);
+        $check_query->execute();
+        $result = $check_query->get_result()->fetch_assoc();
+        
+        if ($result['count'] > 0) {
+            throw new Exception("You have already applied for this election.");
+        }
+
+        // Prepare application form data as JSON
+        $application_form = json_encode([
+            'full_name' => $_POST['full_name'],
+            'age' => $_POST['age'],
+            'phone' => $_POST['phone'],
+            'education' => $_POST['education'],
+            'address' => $_POST['address'],
+            'occupation' => $_POST['occupation'],
+            'political_experience' => $_POST['political_experience'],
+            'profile_photo' => $profile_photo,
+            'aadhar_proof' => $aadhar_proof,
+            'independent_party_name' => $_POST['party_id'] == 'independent' ? $_POST['independent_party_name'] : null,
+            'independent_party_symbol' => $independent_party_symbol
+        ]);
+
+        if ($_POST['party_id'] == 'independent') {
+            // For independent candidates, directly insert into contesting_candidates
+            $stmt = $conn->prepare("INSERT INTO contesting_candidates 
+                (id, party_id, ward_id, election_id,  
+                independent_party_name, independent_party_symbol) 
+                VALUES (?, '1', ?, ?, ?, ?)");
+            $stmt->bind_param("iiiss", $user_id, $ward_id, $_POST['election_id'], 
+                $_POST['independent_party_name'], $independent_party_symbol);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Failed to register independent candidate.");
+            }
+            
+            $message = "Your independent candidacy has been automatically approved!";
+        } else {
+            // For party candidates, insert into candidate_applications
+            $stmt = $conn->prepare("INSERT INTO candidate_applications 
+                (id, party_id, ward_id, election_id, application_form, application_status, 
+                created_at) 
+                VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
+            $stmt->bind_param("iiiis", $user_id, $_POST['party_id'], $ward_id, 
+                $_POST['election_id'], $application_form);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Failed to submit application to database.");
+            }
+            
+            $message = "Application submitted successfully! Your application is now pending for review.";
+        }
+
+        // Commit transaction
+        $conn->commit();
+        $messageType = "success";
+
+        // Clear form data on successful submission
+        $_POST = array();
+        
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        $conn->rollback();
+        
+        // Delete uploaded files if they exist
+        if (!empty($profile_photo) && file_exists($profile_photo)) {
+            unlink($profile_photo);
+        }
+        if (!empty($aadhar_proof) && file_exists($aadhar_proof)) {
+            unlink($aadhar_proof);
+        }
+        if (!empty($independent_party_symbol) && file_exists($independent_party_symbol)) {
+            unlink($independent_party_symbol);
+        }
+
+        $message = "Error: " . $e->getMessage();
+        $messageType = "error";
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Candidate Application Form</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Application</title>
     <style>
-        .container { max-width: 1200px; margin: 20px auto; padding: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input, select, textarea { width: 100%; padding: 8px; }
-        .required { color: red; }
-        .photo-preview { max-width: 200px; margin: 10px 0; }
+        /* Form Container Styles */
+.application-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 30px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.application-container h2 {
+    color:light green;
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 28px;
+    border-bottom: 3px solid green;
+    padding-bottom: 10px;
+}
+
+/* Form Element Styles */
+.form-group {
+    margin-bottom: 25px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    color:rgb(30, 167, 75);
+    font-weight: 600;
+    font-size: 16px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="tel"],
+textarea,
+select {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: border-color 0.3s ease;
+    background: #f8f9fa;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+textarea:focus,
+select:focus {
+    border-color: lightgreen;
+    outline: none;
+    box-shadow: 0 0 5px rgba(52, 219, 127, 0.3);
+}
+
+textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* File Input Styling */
+.file-input-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.file-input-label {
+    display: inline-block;
+    padding: 12px 20px;
+    background:green;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.file-input-label:hover {
+    background: rgba(37, 185, 104, 0.3);
+}
+
+input[type="file"] {
+    display: none;
+}
+
+/* Select Dropdown Styling */
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 15px;
+}
+
+/* Submit Button Styling */
+button[type="submit"] {
+    width: 100%;
+    padding: 15px;
+    background:orange;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    margin-top: 20px;
+}
+
+button[type="submit"]:hover {
+    background:rgb(155, 105, 58);
+    transform: translateY(-2px);
+}
+
+/* Message Styling */
+.success {
+    background: #d4edda;
+    color: #155724;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #28a745;
+}
+
+.error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #dc3545;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .application-container {
+        margin: 20px;
+        padding: 20px;
+    }
+    
+    button[type="submit"] {
+        padding: 12px;
+    }
+}
+.independent-fields {
+            display: none;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px solid #e0e0e0;
+        }
+
+ .independent-fields.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Candidate Application Form</h2>
-        
-        <form id="candidateForm" action="candidate_application.php" method="post" enctype="multipart/form-data">
-            <div class="form-group">
-                <label>Profile Photo <span class="required">*</span></label>
-                <input type="file" name="profile_photo" accept="image/*" required>
-                <img id="photoPreview" class="photo-preview">
-            </div>
 
-            <div class="form-group">
-                <label for="full_name">Full Name *</label>
-                <input type="text" id="full_name" name="full_name" required>
-                <div class="error-message"></div>
-            </div>
+<div class="application-container">
+    <h2>Candidate Application Form</h2>
+    <?php if ($message): ?>
+        <div class="<?php echo $messageType; ?>">
+            <?php echo $message; ?>
+        </div>
+    <?php endif; ?>
 
-            <div class="form-group">
-                <label for="age">Age *</label>
-                <input type="number" id="age" name="age" required>
-                <div class="error-message"></div>
-            </div>
+    <?php if ($isContesting): ?>
+        <div class="error">
+            <?php echo $message; ?>
+        </div>
+    <?php elseif ($hasPendingApplication): ?>
+        <div class="error">
+            <?php echo $message; ?>
+        </div>
+    <?php elseif (!$electionsResult || $electionsResult->num_rows === 0): ?>
+        <div class="error">
+            No available elections found for your ward at this time.
+        </div>
+    <?php else: ?>
 
-            <div class="form-group">
-                <label for="phone">Phone Number *</label>
-                <input type="tel" id="phone" name="phone" required>
-                <div class="error-message"></div>
+    <form method="post" action="candidate_application.php" enctype="multipart/form-data">
+        <div class="form-group">
+            <label>Profile Photo</label>
+            <div class="file-input-container">
+                <label class="file-input-label" for="profile_photo">Choose Profile Photo</label>
+                <input id="profile_photo" type="file" name="profile_photo" accept="image/*" required>
+                <div id="profile_photo_preview" style="margin-top: 10px; display: none;">
+            <img id="preview_image" style="max-width: 200px; max-height: 200px; border-radius: 5px;">
+        </div>
             </div>
+        </div>
 
-            <div class="form-group">
-                <label for="education">Education *</label>
-                <input type="text" id="education" name="education" required>
-                <div class="error-message"></div>
-            </div>
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" name="full_name" required>
+        </div>
+<div class="form-group">
+    <label>Age</label>
+    <input type="number" name="age" required min="18">
+</div>
+<div class="form-group">
+    <label>Phone Number</label>
+    <input type="tel" name="phone" required pattern="^[6789]\d{9}$">
+</div>
+<div class="form-group">
+     <label>Education</label>
+    <input type="text" name="education" required>
+</div>
+<div class="form-group">
+    <label>Address</label>
+    <textarea name="address" required rows="3"></textarea>
+</div>
+<div class="form-group">
+    <label>Occupation</label>
+    <input type="text" name="occupation" required>
+</div>
+<div class="form-group">
+    <label>Political Experience</label>
+    <textarea name="political_experience" rows="3"></textarea>
+</div>
 
-            <div class="form-group">
-                <label for="address">Address *</label>
-                <textarea id="address" name="address" required></textarea>
-                <div class="error-message"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Occupation <span class="required">*</span></label>
-                <input type="text" name="occupation" required>
-            </div>
-
-            <div class="form-group">
-                <label>Political Experience</label>
-                <textarea name="political_experience" rows="3"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Aadhar Proof <span class="required">*</span></label>
-                <input type="file" name="aadhar_proof" accept="image/*" required>
-            </div>
-
-            <div class="form-group">
-                <label>Select Party <span class="required">*</span></label>
-                <select name="party_id" required>
-                    <?php
-                    $parties = $conn->query("SELECT party_id, party_name FROM parties");
-                    while($party = $parties->fetch_assoc()) {
-                        echo "<option value='{$party['party_id']}'>{$party['party_name']}</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Select Ward <span class="required">*</span></label>
-                <select name="ward_id" required>
-                    <?php
-                    $wards = $conn->query("SELECT ward_id, ward_name FROM wards");
-                    while($ward = $wards->fetch_assoc()) {
-                        echo "<option value='{$ward['ward_id']}'>Ward {$ward['ward_name']}</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-
-            <button type="submit" class="btn-primary">Submit Application</button>
-        </form>
+<div class="form-group">
+    <label>Aadhar Proof</label>
+    <div class="file-input-container">
+        <label class="file-input-label" for="aadhar_proof">Choose Aadhar Proof</label>
+        <input id="aadhar_proof" type="file" name="aadhar_proof" accept="application/pdf" required>
+        <div id="aadhar_proof_preview" style="margin-top: 10px;"></div>
     </div>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Debug log to ensure script is running
-        console.log('Script loaded');
-
-        // Get all input fields
-        const inputs = document.querySelectorAll('input, textarea, select');
-        console.log('Found inputs:', inputs.length);
-
-        // Validation rules
-        const rules = {
-            full_name: {
-                regex: /^[a-zA-Z\s]{3,50}$/,
-                message: 'Name should be 3-50 characters long and contain only letters'
-            },
-            age: {
-                regex: /^(2[5-9]|[3-9][0-9])$/,
-                message: 'Age must be 25 or above'
-            },
-            phone: {
-                regex: /^[6,7,8,9][0-9]{9}$/,
-                message: 'Please enter a valid 10-digit phone number'
-            },
-            education: {
-                regex: /.{3,}/,
-                message: 'Please enter education details (minimum 3 characters)'
-            },
-            address: {
-                regex: /.{10,}/,
-                message: 'Please enter complete address (minimum 10 characters)'
+</div>
+       <div class="form-group">
+           <label>Select Ward</label>
+           <select name="ward_id" required>
+               <option value="">Select a ward</option>
+               <?php
+            $wards = $conn->query("SELECT ward_id, ward_name FROM wards ORDER BY ward_name");
+            while ($ward = $wards->fetch_assoc()) {
+                echo "<option value='" . htmlspecialchars($ward['ward_id']) . "'>" . htmlspecialchars($ward['ward_name']) . "</option>";
             }
-        };
+            ?>
+        </select>
+    </div> 
+    <div class="form-group">
+            <label>Select Party</label>
+            <select name="party_id" id="party_id" required onchange="toggleIndependentFields()">
+                <option value="">Select a party</option>
+                <option value="independent">Independent Candidate</option>
+                <?php
+                $parties = $conn->query("SELECT party_id, party_name FROM parties WHERE party_id != 'independent' ORDER BY party_name");
+                while ($party = $parties->fetch_assoc()) {
+                    echo "<option value='" . htmlspecialchars($party['party_id']) . "'>" . htmlspecialchars($party['party_name']) . "</option>";
+                }
+                ?>
+            </select>
+        </div>
 
-        // Add validation to each input
-        inputs.forEach(input => {
-            // Create error message element if it doesn't exist
-            let errorDiv = input.parentElement.querySelector('.error-message');
-            if (!errorDiv) {
-                errorDiv = document.createElement('div');
-                errorDiv.className = 'error-message';
-                input.parentElement.appendChild(errorDiv);
+        <div id="independent-fields" class="independent-fields">
+            <div class="form-group">
+                <label>Independent Party Name</label>
+                <input type="text" name="independent_party_name">
+            </div>
+
+            <div class="form-group">
+                <label>Party Symbol</label>
+                <div class="file-input-container">
+                    <label class="file-input-label" for="independent_party_symbol">Choose Party Symbol</label>
+                    <input id="independent_party_symbol" type="file" name="independent_party_symbol" accept="image/*">
+                    <div id="party_symbol_preview" style="margin-top: 10px; display: none;">
+                        <img id="symbol_preview_image" style="max-width: 200px; max-height: 200px; border-radius: 5px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    <div class="form-group">
+        <label>Select Election</label>
+        <select name="election_id" required>
+            <option value="">Select an election</option>
+            <?php
+          while ($election = $electionsResult->fetch_assoc()) {
+              echo "<option value='" . htmlspecialchars($election['election_id']) . "'>" . htmlspecialchars($election['election_title']) . "</option>";
             }
-
-            // Add validation on input
-            input.addEventListener('input', function() {
-                validateInput(input);
-            });
-
-            // Add validation on blur
-            input.addEventListener('blur', function() {
-                validateInput(input);
-            });
-
-            console.log('Added validation to:', input.id);
-        });
-
-        function validateInput(input) {
-            console.log('Validating:', input.id); // Debug log
-
-            const rule = rules[input.id];
-            const errorDiv = input.parentElement.querySelector('.error-message');
             
-            // Remove previous validation classes
-            input.classList.remove('valid', 'invalid');
-            
-            // Skip validation if no rule exists for this input
-            if (!rule) return;
-
-            // Validate
-            const isValid = rule.regex.test(input.value);
-            console.log('Validation result:', isValid); // Debug log
-
-            if (!isValid) {
-                input.classList.add('invalid');
-                errorDiv.textContent = rule.message;
-                errorDiv.style.display = 'block';
-            } else {
-                input.classList.add('valid');
-                errorDiv.style.display = 'none';
-            }
-        }
-    });
-    </script>
-
-    <style>
-    /* Add these styles at the bottom of your file */
-    .form-group {
-        position: relative;
-        margin-bottom: 20px;
-    }
-
-    .error-message {
-        color: #dc3545;
-        font-size: 12px;
-        margin-top: 5px;
-        display: none;
-        position: absolute;
-        bottom: -18px;
-    }
-
-    input.invalid,
-    textarea.invalid,
-    select.invalid {
-        border: 2px solid #dc3545 !important;
-        background-color: #fff8f8 !important;
-    }
-
-    input.valid,
-    textarea.valid,
-    select.valid {
-        border: 2px solid #28a745 !important;
-        background-color: #f8fff8 !important;
-    }
-
-    /* Make sure error messages are visible */
-    .invalid + .error-message {
-        display: block !important;
-    }
-.btn-primary{
-    background-color: orange;
-    color: white;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-    </style>
+            ?>
+        </select>
+        
+    </div>
+        <button type="submit">Submit Application</button>
+    </form>
+    <?php endif; ?>
+</div>
 </body>
 </html>

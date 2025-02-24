@@ -103,16 +103,23 @@ function getWardNames($ward_ids, $wards) {
 
 // Function to determine election status
 function getElectionStatus($start_date, $end_date) {
-    $current_date = date('Y-m-d');
-    
-    if ($current_date < $start_date) {
+    $current_date = new DateTime(); // Current date with time
+    $start = new DateTime($start_date);
+    $end = new DateTime($end_date);
+
+    // Ensure correct comparison by setting proper times
+    $start->setTime(0, 0, 0);
+    $end->setTime(23, 59, 59);
+
+    if ($current_date < $start) {
         return 'Scheduled';
-    } elseif ($current_date > $end_date) {
+    } elseif ($current_date > $end) {
         return 'Completed';
     } else {
         return 'Ongoing';
     }
 }
+
 
 // Fetch all elections
 $elections = [];
@@ -458,9 +465,29 @@ if ($result->num_rows > 0) {
                 font-size: 13px;
             }
         }
+        .btn:disabled {
+    background-color: #cccccc !important;
+    cursor: not-allowed !important;
+    opacity: 0.7;
+}
+
+        .company-logo {
+  top: 2px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.company-logo img {
+  width: 140px;
+  height: auto;
+}
     </style>
 </head>
 <body>
+<div class="company-logo">
+           <a href="admin.php"><img src="assets/logo.jpg" alt="Company logo"></a>
+        </div>
     <div class="container">
         <h2>Manage Elections</h2>
         
@@ -552,20 +579,21 @@ if ($result->num_rows > 0) {
                             <td><?php echo $election['end_date']; ?></td>
                             <td><?php echo $election['status']; ?></td>
                             <td>
-                                <div class="action-buttons">
-                                    <button class="btn btn-primary" 
-                                            onclick='showEditModal(<?php echo json_encode($election); ?>)'>
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <form method="POST" style="margin: 0;">
-                                        <input type="hidden" name="election_id" value="<?php echo $election['election_id']; ?>">
-                                        <button type="submit" name="delete_election" class="btn btn-danger" 
-                                                onclick="return confirm('Are you sure you want to delete this election?')">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
+    <div class="action-buttons">
+        <button class="btn btn-primary" 
+                onclick='showEditModal(<?php echo json_encode($election); ?>)'
+                <?php echo ($election['status'] === 'Completed') ? 'disabled style="background-color: #cccccc; cursor: not-allowed;"' : ''; ?>>
+            <i class="fas fa-edit"></i> Edit    
+        </button>
+        <form method="POST" style="margin: 0;">
+            <input type="hidden" name="election_id" value="<?php echo $election['election_id']; ?>">
+            <button type="submit" name="delete_election" class="btn btn-danger" 
+                    onclick="return confirm('Are you sure you want to delete this election?')">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </form>
+    </div>
+</td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
