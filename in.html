@@ -1,0 +1,496 @@
+<?php
+include 'db.php';
+session_start();
+if (!isset($_SESSION['name'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// Fetch available parties from the database
+$sql_parties = "SELECT * FROM parties";
+$result_parties = $conn->query($sql_parties);
+
+// Fetch available wards from the database
+$sql_wards = "SELECT * FROM wards";
+$result_wards = $conn->query($sql_wards);
+?>
+
+<div class="application-form">
+    <h2>Candidate Application Form</h2>
+    <p class="form-description">Please fill in the details below to submit your candidature application</p>
+
+    <form id="candidateForm" method="POST" action="submit_application.php" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="age">Age</label>
+                <input type="number" id="age" name="age" min="25" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" name="phone" pattern="[0-9]{10}" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="party">Select Party/Independent</label>
+                <select id="party" name="party" required onchange="handlePartySelection(this.value)">
+                    <option value="">Select a party</option>
+                    <?php
+                    if ($result_parties->num_rows > 0) {
+                        while($row = $result_parties->fetch_assoc()) {
+                            echo "<option value='" . $row['party_id'] . "'>" . $row['party_name'] . "</option>";
+                        }
+                    }
+                    ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="ward">Select Ward</label>
+                <select id="ward" name="ward" required>
+                    <option value="">Select a ward</option>
+                    <?php
+                    if ($result_wards->num_rows > 0) {
+                        while($row = $result_wards->fetch_assoc()) {
+                            echo "<option value='" . $row['ward_id'] . "'>Ward " . $row['ward_number'] . " - " . $row['ward_name'] . "</option>";
+                        }
+                    }
+                    ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="address">Residential Address</label>
+            <textarea id="address" name="address" rows="3" required></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="education">Educational Qualification</label>
+                <input type="text" id="education" name="education" required>
+            </div>
+
+            <div class="form-group">
+                <label for="experience">Political Experience (Years)</label>
+                <input type="number" id="experience" name="experience" min="0" required>
+            </div>
+        </div>
+
+        <div id="independentDetails" style="display: none;">
+            <div class="form-group">
+                <label for="symbol_description">Symbol Description</label>
+                <input type="text" id="symbol_description" name="symbol_description" 
+                       placeholder="Describe your preferred election symbol">
+                <small>As an independent candidate, you can suggest a symbol preference. Final symbol will be allocated by the Election Commission.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="symbol_upload">Upload Proposed Symbol</label>
+                <input type="file" id="symbol_upload" name="symbol_upload" accept="image/*">
+                <small>Upload a clear, simple symbol design (Optional)</small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="photo">Upload Photo</label>
+                <input type="file" id="photo" name="photo" accept="image/*" required>
+                <small>Upload a recent passport size photograph</small>
+            </div>
+
+            <div class="form-group">
+                <label for="id_proof">Upload ID Proof</label>
+                <input type="file" id="id_proof" name="id_proof" accept=".pdf,.jpg,.jpeg,.png" required>
+                <small>Upload Aadhar card   </small>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="submit-btn">Submit Application</button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('candidateForm');
+    
+    // Validation patterns and messages
+    const validations = {
+        full_name: {
+            pattern: /^[a-zA-Z\s]{3,50}$/,
+            message: 'Name should be 3-50 characters long and contain only letters'
+        },
+        age: {
+            pattern: /^(2[5-9]|[3-9][0-9])$/,
+            message: 'Age must be 25 or above'
+        },
+        phone: {
+            pattern: /^[0-9]{10}$/,
+            message: 'Enter valid 10-digit phone number'
+        },
+        education: {
+            pattern: /.{3,}/,
+            message: 'Education qualification is required (min 3 characters)'
+        },
+        experience: {
+            pattern: /^[0-9]{1,2}$/,
+            message: 'Enter valid years of experience (0-99)'
+        },
+        address: {
+            pattern: /.{10,}/,
+            message: 'Address should be at least 10 characters long'
+        }
+    };
+
+    // Add error message divs after each input
+    Object.keys(validations).forEach(fieldId => {
+        const input = document.getElementById(fieldId);
+        if (input) {
+            // Create error message div if it doesn't exist
+            if (!input.parentNode.querySelector('.error-message')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                input.parentNode.appendChild(errorDiv);
+            }
+
+            // Add input event listener
+            input.addEventListener('input', function() {
+                validateField(this);
+            });
+
+            // Add blur event listener
+            input.addEventListener('blur', function() {
+                validateField(this);
+            });
+        }
+    });
+
+    function validateField(field) {
+        const validation = validations[field.id];
+        if (!validation) return true;
+
+        const errorDiv = field.parentNode.querySelector('.error-message');
+        if (!errorDiv) return true;
+
+        // Clear previous validation states
+        field.classList.remove('invalid', 'valid');
+        errorDiv.textContent = '';
+        errorDiv.style.display = 'none';
+
+        // Validate field
+        if (!validation.pattern.test(field.value)) {
+            field.classList.add('invalid');
+            errorDiv.textContent = validation.message;
+            errorDiv.style.display = 'block';
+            return false;
+        } else {
+            field.classList.add('valid');
+            return true;
+        }
+    }
+
+    // Form submission validation
+    form.addEventListener('submit', function(e) {
+        let isValid = true;
+
+        // Validate all fields
+        Object.keys(validations).forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field && !validateField(field)) {
+                isValid = false;
+            }
+        });
+
+        // Validate file uploads
+        const photoInput = document.getElementById('photo');
+        const idProofInput = document.getElementById('id_proof');
+
+        if (photoInput && photoInput.files.length > 0) {
+            if (!validateFileUpload(photoInput, 'photo')) {
+                isValid = false;
+            }
+        }
+
+        if (idProofInput && idProofInput.files.length > 0) {
+            if (!validateFileUpload(idProofInput, 'id_proof')) {
+                isValid = false;
+            }
+        }
+
+        if (!isValid) {
+            e.preventDefault();
+            alert('Please correct the errors in the form before submitting.');
+        }
+    });
+
+    function validateFileUpload(input, fieldName) {
+        const file = input.files[0];
+        const errorDiv = input.parentNode.querySelector('.error-message');
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+
+        input.classList.remove('invalid', 'valid');
+        if (errorDiv) {
+            errorDiv.textContent = '';
+            errorDiv.style.display = 'none';
+        }
+
+        if (!allowedTypes.includes(file.type)) {
+            input.classList.add('invalid');
+            if (errorDiv) {
+                errorDiv.textContent = 'Please upload a valid image file (JPG, PNG)';
+                errorDiv.style.display = 'block';
+            }
+            return false;
+        }
+
+        if (file.size > maxSize) {
+            input.classList.add('invalid');
+            if (errorDiv) {
+                errorDiv.textContent = 'File size should be less than 2MB';
+                errorDiv.style.display = 'block';
+            }
+            return false;
+        }
+
+        input.classList.add('valid');
+        return true;
+    }
+
+    // Handle party selection
+    const partySelect = document.getElementById('party');
+    if (partySelect) {
+        partySelect.addEventListener('change', function() {
+            handlePartySelection(this.value);
+        });
+    }
+});
+
+// Party selection handler
+function handlePartySelection(partyId) {
+    const independentDetails = document.getElementById('independentDetails');
+    const symbolDescription = document.getElementById('symbol_description');
+    
+    fetch(`get_party_name.php?party_id=${partyId}`)
+        .then(response => response.json())
+        .then(data => {
+            if(data.party_name === 'Independent Candidate') {
+                independentDetails.style.display = 'block';
+                symbolDescription.required = true;
+            } else {
+                independentDetails.style.display = 'none';
+                symbolDescription.required = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+</script>
+
+<style>
+    .application-form {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .application-form h2 {
+        color: var(--primary-green);
+        margin-bottom: 10px;
+        font-size: 24px;
+        font-weight: 600;
+    }
+
+    .form-description {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 14px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+        position: relative;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--dark-green);
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select,
+    textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    input[type="file"] {
+        width: 100%;
+        padding: 10px;
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.1);
+        outline: none;
+    }
+
+    select {
+        background-color: white;
+    }
+
+    textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-actions {
+        margin-top: 30px;
+        text-align: center;
+    }
+
+    .submit-btn {
+        background: linear-gradient(135deg, var(--primary-green) 0%, var(--light-green) 100%);
+        color: white;
+        padding: 14px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .submit-btn:active {
+        transform: translateY(0);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .application-form {
+            padding: 20px;
+        }
+    }
+
+    /* Add styles for independent candidate section */
+    #independentDetails {
+        background: rgba(46, 125, 50, 0.05);
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+    }
+
+    #independentDetails small {
+        color: #666;
+        display: block;
+        margin-top: 5px;
+        font-style: italic;
+    }
+
+    #independentDetails .form-group {
+        margin-bottom: 15px;
+    }
+
+    /* Style for the symbol upload area */
+    #independentDetails input[type="file"] {
+        border: 2px dashed #4CAF50;
+        padding: 15px;
+        border-radius: 8px;
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    .invalid {
+        border-color: #dc3545 !important;
+        background-color: #fff8f8;
+    }
+
+    .valid {
+        border-color: #28a745 !important;
+        background-color: #f8fff8;
+    }
+
+    .error-message {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 5px;
+        display: none;
+    }
+
+    .success-message {
+        color: #28a745;
+        font-size: 16px;
+        margin-top: 5px;
+        display: block;
+    }
+
+    .message {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .message.success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .message.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* Add animation for validation feedback */
+    .error-message {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .invalid + .error-message {
+        opacity: 1;
+    }
+
+    /* Success indicator */
+    .valid::after {
+        content: '✓';
+        color: #28a745;
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+</style>

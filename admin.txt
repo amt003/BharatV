@@ -1,0 +1,27 @@
+ // Update application status
+        function updateStatus(applicationId, status) {
+            if(confirm(`Are you sure you want to ${status} this application?`)) {
+                fetch('update_application_status.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        application_id: applicationId,
+                        status: status
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        location.reload();
+                    } else {
+                        alert('Error updating status');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error processing request');
+                });
+            }
+        }
