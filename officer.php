@@ -2,6 +2,12 @@
 session_start();
 require_once 'db.php'; // Ensure database connection
 
+// Add cache control headers to prevent browser caching
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+
 // Check if the user is logged in and is a returning officer
 if (!isset($_SESSION['ro_id']) || $_SESSION['role'] !== 'returning_officer') {
     header('Location: login.php');
@@ -12,7 +18,8 @@ if (!isset($_SESSION['ro_id']) || $_SESSION['role'] !== 'returning_officer') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $application_id = $_POST['application_id'];
     $action = $_POST['action']; // 'approve' or 'reject'
-
+    
+    
     // Start transaction
     $conn->begin_transaction();
 
@@ -20,10 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // First update the application status
         if ($action === 'approve') {
             $stmt = $conn->prepare("UPDATE candidate_applications SET application_ro_approval = 'approved' WHERE application_id = ?");
+            $stmt->bind_param("i", $application_id);
         } else {
+            // Include rejection reason when rejecting
             $stmt = $conn->prepare("UPDATE candidate_applications SET application_ro_approval = 'rejected' WHERE application_id = ?");
+            $stmt->bind_param("i", $application_id);
         }
-        $stmt->bind_param("i", $application_id);
         $stmt->execute();
 
         // If approving, insert into contesting_candidates
@@ -44,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $details['party_id'] = null;
             }
 
-            // Insert into contesting_candidates without the status field
+            // Insert into contesting_candidates with all fields
             $insertQuery = $conn->prepare("
                 INSERT INTO contesting_candidates 
                 (id, Election_id, ward_id, party_id, application_type, 
@@ -440,34 +449,34 @@ if (isset($_SESSION['message'])): ?>
         }
 
         .view-btn {
-            background-color: #007bff; /* Blue for view */
-            color: white; /* White text */
+            background-color:orangered ; 
+            color: white; 
         }
 
         .view-btn:hover {
-            background-color: #0056b3; /* Darker blue on hover */
+            background-color: orange; 
         }
 
         /* Modal Styles */
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
-            left: 0;
+            display: none;
+            position: fixed;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgb(0,0,0); /* Fallback color */
-            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
         }
 
         .modal-content {
-            background-color: #fefefe; /* White background */
-            margin: 15% auto; /* 15% from the top and centered */
-            padding: 20px; /* Padding inside the modal */
-            border: 1px solid #888; /* Border for modal */
-            width: 80%; /* Could be more or less, depending on screen size */
+            position: relative;
+            background-color: white;
+            margin: 50px auto;
+            padding: 20px;
+            width: 90%;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         .close-btn {
@@ -480,9 +489,119 @@ if (isset($_SESSION['message'])): ?>
         .close-btn:hover,
         .close-btn:focus {
             color: black; /* Black on hover */
-            text-decoration: none; /* No underline */
-            cursor: pointer; /* Pointer cursor */
+            text-decoration: none; 
+            cursor: pointer; 
         }
+        .logout-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: var(--primary-color);
+            color: white;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }   
+
+        .logout-btn:hover {
+            background:rgb(15, 203, 56);
+        }
+
+        /* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4caf50;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #45a049;
+}
+
+/* Hide the scrollbar arrows */
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+.no-nominations-message {
+    text-align: center;
+    padding: 40px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+    border: 2px dashed #dee2e6;
+}
+
+.no-nominations-message i {
+    font-size: 48px;
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+.no-nominations-message h3 {
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.no-nominations-message p {
+    color: #6c757d;
+    font-size: 1.1em;
+}
+
+.no-wards-message {
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+    border: 2px dashed #dee2e6;
+}
+
+.no-wards-message i {
+    font-size: 36px;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.no-wards-message h4 {
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.no-wards-message p {
+    color: #6c757d;
+}
+
+.no-candidates-message {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 10px 0;
+    border: 1px dashed #dee2e6;
+    list-style: none;
+}
+
+.no-candidates-message i {
+    font-size: 24px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.no-candidates-message p {
+    color: #6c757d;
+    margin: 0;
+}
+
     </style>
 </head>
 <body>
@@ -492,129 +611,154 @@ if (isset($_SESSION['message'])): ?>
         <div class="party-info">
             <div class="party-details">
                 <h1>Returning Officer Dashboard</h1>
-                <p>Manage Candidate Applications</p>
+                <p>Manage Candidate Nominations</p>
             </div>
         </div>
         <a href="logout.php" class="logout-btn">Logout</a>
     </div>
 
     <div class="application-container">
-        <h2>Nominations</h2>
-        <?php while ($election = $electionsResult->fetch_assoc()): ?>
-            <div class="election-section">
-                <h3><?php echo htmlspecialchars($election['Election_title']); ?></h3>
-                <div class="election-info">
-                    <strong>Status:</strong> <?php echo htmlspecialchars($election['status']); ?><br>
-                    <strong>Start Date:</strong> <?php echo htmlspecialchars($election['start_date']); ?><br>
-                    <strong>End Date:</strong> <?php echo htmlspecialchars($election['end_date']); ?>
-                </div>
-                
-                <div class="wards-container">
-                    <?php
-                    // Fetch only wards associated with this election
-                    $wardsQuery = $conn->prepare("
-                        SELECT DISTINCT w.ward_id, w.ward_name 
-                        FROM wards w 
-                        JOIN elections ew ON w.ward_id = ew.ward_ids 
-                        WHERE ew.election_id = ?
-                    ");
-                    $wardsQuery->bind_param("i", $election['election_id']);
-                    $wardsQuery->execute();
-                    $wardsResult = $wardsQuery->get_result();
-
-                    while ($ward = $wardsResult->fetch_assoc()): 
-                        // Get candidates for this ward and election
-                        $candidatesQuery = $conn->prepare("
-                            SELECT 
-                                ca.application_id,
-                                ca.application_ro_approval,
-                                ca.application_party_approval,
-                                ca.application_type,
-                                ca.election_id,
-                                ca.ward_id,
-                                u.name,
-                                u.phone,
-                                u.email,
-                                p.party_name,
-                                p.party_id,
-                                ca.independent_party_name,
-                                ca.independent_party_symbol
-                            FROM candidate_applications ca 
-                            JOIN users u ON ca.id = u.id 
-                            LEFT JOIN parties p ON ca.party_id = p.party_id 
-                            WHERE ca.ward_id = ? 
-                            AND ca.election_id = ?
-                            ORDER BY ca.application_id DESC
+        <h2 style="text-align:center;margin-bottom:10px;">Nominations</h2>
+        <?php 
+        if ($electionsResult->num_rows === 0): ?>
+            <div class="no-nominations-message">
+                <i class="fas fa-calendar-times"></i>
+                <h3>No Scheduled Elections</h3>
+                <p>There are currently no elections scheduled for nominations.</p>
+            </div>
+        <?php else: 
+            while ($election = $electionsResult->fetch_assoc()): ?>
+                <div class="election-section">
+                    <h3><?php echo htmlspecialchars($election['Election_title']); ?></h3>
+                    <div class="election-info">
+                        <strong>Status:</strong> <?php echo htmlspecialchars($election['status']); ?><br>
+                        <strong>Start Date:</strong> <?php echo htmlspecialchars($election['start_date']); ?><br>
+                        <strong>End Date:</strong> <?php echo htmlspecialchars($election['end_date']); ?>
+                    </div>
+                    
+                    <div class="wards-container">
+                        <?php
+                        // Fetch only wards associated with this election
+                        $wardsQuery = $conn->prepare("
+                            SELECT DISTINCT w.ward_id, w.ward_name 
+                            FROM wards w 
+                            JOIN elections ew ON w.ward_id = ew.ward_ids 
+                            WHERE ew.election_id = ?
                         ");
-                        $candidatesQuery->bind_param("ii", $ward['ward_id'], $election['election_id']);
-                        $candidatesQuery->execute();
-                        $candidatesResult = $candidatesQuery->get_result();
-                    ?>
-                        <div class="ward-card">
-                            <h4>Ward <?php echo htmlspecialchars($ward['ward_name']); ?></h4>
-                            <ul class="candidate-list">
-                                <?php if ($candidatesResult->num_rows > 0): ?>
-                                    <?php while ($candidate = $candidatesResult->fetch_assoc()): ?>
-                                        <li class="candidate-item">
-                                            <div class="candidate-info">
-                                                <div class="candidate-name">
-                                                    <strong>Name:</strong> 
-                                                    <strong><?php echo htmlspecialchars($candidate['name']); ?></strong>
-                                                </div>
-                                                <div class="candidate-details">
-                                                    <i class="fas fa-phone"></i> <?php echo htmlspecialchars($candidate['phone']); ?>
-                                                    <br>
-                                                    <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($candidate['email']); ?>
-                                                </div>
-                                                <div>
-                                                    <strong>Party:</strong> 
-                                                    <?php echo htmlspecialchars($candidate['party_name'] ?? 'Independent Candidate'); ?>
-                                                    <br>
-                                                    <?php if ($candidate['application_type'] === 'party'): ?>
+                        $wardsQuery->bind_param("i", $election['election_id']);
+                        $wardsQuery->execute();
+                        $wardsResult = $wardsQuery->get_result();
+
+                        if ($wardsResult->num_rows === 0): ?>
+                            <div class="no-wards-message">
+                                <i class="fas fa-map-marker-slash"></i>
+                                <h4>No Wards Assigned</h4>
+                                <p>This election has no wards assigned yet.</p>
+                            </div>
+                        <?php else:
+                            while ($ward = $wardsResult->fetch_assoc()): 
+                                // Get candidates for this ward and election
+                                $candidatesQuery = $conn->prepare("
+                                    SELECT 
+                                        ca.application_id,
+                                        ca.application_ro_approval,
+                                        ca.application_party_approval,
+                                        ca.application_type,
+                                        ca.election_id,
+                                        ca.ward_id,
+                                        u.name,
+                                        u.phone,
+                                        u.email,
+                                        p.party_name,
+                                        p.party_id,
+                                        ca.independent_party_name,
+                                        ca.independent_party_symbol
+                                    FROM candidate_applications ca 
+                                    JOIN users u ON ca.id = u.id 
+                                    LEFT JOIN parties p ON ca.party_id = p.party_id 
+                                    WHERE ca.ward_id = ? 
+                                    AND ca.election_id = ?
+                                    AND (
+                                        (ca.application_type = 'independent')
+                                        OR 
+                                        (ca.application_type = 'party' AND ca.application_party_approval = 'approved')
+                                    )
+                                    ORDER BY ca.application_id DESC
+                                ");
+                                $candidatesQuery->bind_param("ii", $ward['ward_id'], $election['election_id']);
+                                $candidatesQuery->execute();
+                                $candidatesResult = $candidatesQuery->get_result();
+                            ?>
+                                <div class="ward-card">
+                                    <h4><?php echo htmlspecialchars($ward['ward_name']); ?> Ward</h4>
+                                    <ul class="candidate-list">
+                                        <?php if ($candidatesResult->num_rows > 0): ?>
+                                            <?php while ($candidate = $candidatesResult->fetch_assoc()): ?>
+                                                <li class="candidate-item">
+                                                    <div class="candidate-info">
+                                                        <div class="candidate-name">
+                                                            <strong>Name:</strong> 
+                                                            <strong><?php echo htmlspecialchars($candidate['name']); ?></strong>
+                                                        </div>
+                                                        <div class="candidate-details">
+                                                            <i class="fas fa-phone"></i> <?php echo htmlspecialchars($candidate['phone']); ?>
+                                                            <br>
+                                                            <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($candidate['email']); ?>
+                                                        </div>
                                                         <div>
-                                                            <strong>Party Approval:</strong>
-                                                            <span class="status-badge status-<?php echo strtolower($candidate['application_party_approval'] ?? 'pending'); ?>">
-                                                                <?php echo ucfirst($candidate['application_party_approval'] ?? 'Pending'); ?>
+                                                            <strong>Party:</strong> 
+                                                            <?php echo htmlspecialchars($candidate['party_name'] ?? 'Independent Candidate'); ?>
+                                                            <br>
+                                                            <?php if ($candidate['application_type'] === 'party'): ?>
+                                                                <div>
+                                                                    <strong>Party Approval:</strong>
+                                                                    <span class="status-badge status-<?php echo strtolower($candidate['application_party_approval'] ?? 'pending'); ?>">
+                                                                        <?php echo ucfirst($candidate['application_party_approval'] ?? 'Pending'); ?>
+                                                                    </span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                            <strong>RO Approval:</strong>
+                                                            <span class="status-badge status-<?php echo strtolower($candidate['application_ro_approval'] ?? 'pending'); ?>">
+                                                                <?php echo ucfirst($candidate['application_ro_approval'] ?? 'Pending'); ?>
                                                             </span>
                                                         </div>
-                                                    <?php endif; ?>
-                                                    <strong>RO Approval:</strong>
-                                                    <span class="status-badge status-<?php echo strtolower($candidate['application_ro_approval'] ?? 'pending'); ?>">
-                                                        <?php echo ucfirst($candidate['application_ro_approval'] ?? 'Pending'); ?>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div class="action-buttons">
-                                                <?php if (!in_array($candidate['application_ro_approval'], ['approved', 'rejected'])): ?>
-                                                    <form method="post" action="" class="action-form">
-                                                        <input type="hidden" name="application_id" value="<?php echo $candidate['application_id']; ?>">
-                                                        <button type="submit" name="action" value="approve" class="action-btn approve-btn">
-                                                            <i class="fas fa-check-circle"></i>
-                                                            <span>Approve</span>
+                                                    </div>
+                                                    <div class="action-buttons">
+                                                        <?php if (!in_array($candidate['application_ro_approval'], ['approved', 'rejected'])): ?>
+                                                            <form method="post" action="" class="action-form">
+                                                                <input type="hidden" name="application_id" value="<?php echo $candidate['application_id']; ?>">
+                                                                <button type="submit" name="action" value="approve" class="action-btn approve-btn">
+                                                                    <i class="fas fa-check-circle"></i>
+                                                                    <span>Approve</span>
+                                                                </button>
+                                                                <button type="submit" name="action" value="reject" class="action-btn reject-btn">
+                                                                    <i class="fas fa-times-circle"></i>
+                                                                    <span>Reject</span>
+                                                                </button>
+                                                            </form>
+                                                        <?php endif; ?>
+                                                        <button type="button" class="action-btn view-btn" 
+                                                                onclick="viewCandidate(<?php echo $candidate['application_id']; ?>)">
+                                                            <i class="fas fa-eye"></i>
+                                                            <span>View Details</span>
                                                         </button>
-                                                        <button type="submit" name="action" value="reject" class="action-btn reject-btn">
-                                                            <i class="fas fa-times-circle"></i>
-                                                            <span>Reject</span>
-                                                        </button>
-                                                    </form>
-                                                <?php endif; ?>
-                                                <button type="button" class="action-btn view-btn" 
-                                                        onclick="viewCandidate(<?php echo $candidate['application_id']; ?>)">
-                                                    <i class="fas fa-eye"></i>
-                                                    <span>View Details</span>
-                                                </button>
-                                            </div>
-                                        </li>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <li class="no-candidates">No applications for this ward</li>
-                                <?php endif; ?>
-                            </ul>
-                        </div>
-                    <?php endwhile; ?>
+                                                    </div>
+                                                </li>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <li class="no-candidates-message">
+                                                <i class="fas fa-user-slash"></i>
+                                                <p>No nominations received for this ward yet.</p>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            <?php endwhile;
+                        endif; ?>
+                    </div>
                 </div>
-            </div>
-        <?php endwhile; ?>
+            <?php endwhile;
+        endif; ?>
     </div>
 </div>
 
@@ -628,6 +772,7 @@ if (isset($_SESSION['message'])): ?>
         </div>
     </div>
 </div>
+
 <script>
 function viewCandidate(applicationId) {
     const modal = document.getElementById('candidateModal');
@@ -756,6 +901,9 @@ window.onclick = function(event) {
         modal.style.display = 'none';
     }
 }
+
+   
+
 </script>
 
 </body>

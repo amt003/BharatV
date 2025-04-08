@@ -53,7 +53,7 @@ $result = $stmt->get_result();
                         <div class="winner-badge">Winner</div>
                     <?php endif; ?>
                     
-                    <h3><?php echo htmlspecialchars($row['election_title']); ?></h3>
+                    <h3 class="election-title"><?php echo htmlspecialchars($row['election_title']); ?></h3>
                     <p>Ward: <?php echo htmlspecialchars($row['ward_name']); ?></p>
                     <p>Election Date: <?php echo date('d M Y', strtotime($row['start_date'])); ?>
                     <?php if (isset($row['end_date']) && !empty($row['end_date'])): ?> 
@@ -97,7 +97,9 @@ $result = $stmt->get_result();
     color: var(--primary-green);
     margin-bottom: 20px;
 }   
-
+.election-title{
+    text-align: center;
+}
 .reports-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

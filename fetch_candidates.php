@@ -1,16 +1,44 @@
 <?php
+session_start();
 require_once 'db.php';
 
-if (isset($_GET['election_id'])) {
-    $election_id = $_GET['election_id'];
-    
-    // Query to fetch approved candidates
-    $query = $conn->prepare("
-        SELECT 
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['admin', 'voter', 'candidate'])) {
+    header("HTTP/1.1 403 Forbidden");
+    echo "Access denied";
+    exit();
+}
+
+// Validate election_id
+if (!isset($_GET['election_id']) || !is_numeric($_GET['election_id'])) {
+    header("HTTP/1.1 400 Bad Request");
+    echo "Invalid election ID";
+    exit();
+}
+
+$election_id = intval($_GET['election_id']);
+
+// Get election details
+$election_query = $conn->prepare("SELECT election_title FROM elections WHERE election_id = ?");
+$election_query->bind_param("i", $election_id);
+$election_query->execute();
+$election_result = $election_query->get_result();
+
+if ($election_result->num_rows === 0) {
+    echo "<p>Election not found.</p>";
+    exit();
+}
+
+$election = $election_result->fetch_assoc();
+
+// Get candidates for this election
+$candidates_query = $conn->prepare("
+  SELECT 
             cc.id,
             cc.application_type,
             cc.independent_party_name,
             cc.independent_party_symbol,
+          
             u.name,
             u.phone,
             u.email,
@@ -24,117 +52,215 @@ if (isset($_GET['election_id'])) {
         LEFT JOIN parties p ON cc.party_id = p.party_id
         WHERE cc.Election_id = ?
         ORDER BY w.ward_name, u.name
-    ");
-    
-    $query->bind_param("i", $election_id);
-    $query->execute();
-    $result = $query->get_result();
-    
-    if ($result->num_rows > 0) {
-        ?>
-        <style>
-            .candidates-list {
-                list-style-type: none;
-                padding: 0;
-                margin: 0;
-            }
+");
 
-            .candidate-card {
-                background: white;
-                margin: 10px 0;
-                padding: 15px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-
-            .candidate-name {
-                font-size: 1.1em;
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 5px;
-            }
-
-            .candidate-details {
-                color: #666;
-                font-size: 0.9em;
-            }
-
-            .ward-section {
-                margin: 20px 0;
-            }
-
-            .ward-title {
-                background: #f5f5f5;
-                padding: 10px;
-                margin: 15px 0;
-                border-radius: 5px;
-                font-weight: 600;
-            }
-
-            .party-name {
-                color: #2196F3;
-                font-weight: 500;
-            }
-
-            .contact-info {
-                margin-top: 5px;
-                font-size: 0.85em;
-            }
-            .candidate-image {
-                width: 80px;
-                height: 80px;
-                border-radius: 50%;
-                object-fit: cover;
-                border: 2px solid #ddd;
-            }
-        </style>
-
-        <?php
-        // Group candidates by ward
-        $current_ward = '';
-        echo '<div class="candidates-list">';
-
-        while ($candidate = $result->fetch_assoc()) {
-            if ($current_ward !== $candidate['ward_name']) {
-                if ($current_ward !== '') {
-                    echo '</div>'; // Close previous ward section
-                }
-                $current_ward = $candidate['ward_name'];
-                echo '<div class="ward-section">';
-                echo '<div class="ward-title">Ward: ' . htmlspecialchars($candidate['ward_name']) . '</div>';
-            }
-
-            // Determine party name based on application type
-            $party_name = $candidate['application_type'] === 'independent' 
-                ? $candidate['independent_party_name'] . ' (Independent)'
-                : $candidate['party_name'];
-            ?>
-            <div class="candidate-card">
-                <img src="assets/candidate.jpg" alt="Candidate Image" class="candidate-image">
-                <div class="candidate-name">
-                    Name: <?php echo htmlspecialchars($candidate['name']); ?>
-                </div>
-                <div class="candidate-details">
-                    <span class="party-name">
-                        Party Name: <?php echo htmlspecialchars($party_name); ?>
-                    </span>
-
-                    <div class="contact-info">
-                        Phone Number: <i class="fas fa-phone"></i> <?php echo htmlspecialchars($candidate['phone']); ?>
-                        <br>
-                        Email: <i class="fas fa-envelope"></i> <?php echo htmlspecialchars($candidate['email']); ?>
-                    </div>
-                </div>
-            </div>
-            <?php
-        }
-        echo '</div>'; // Close last ward section
-        echo '</div>'; // Close candidates list
-        
-    } else {
-        echo '<div class="no-candidates">No candidates found for this election.</div>';
-    }
-} else {
-    echo '<div class="error">No election ID provided.</div>';
-}
+$candidates_query->bind_param("i", $election_id);
+$candidates_query->execute();
+$candidates_result = $candidates_query->get_result();
 ?>
+
+<div class="candidates-section">
+    <h3>Candidates for <?php echo htmlspecialchars($election['election_title']); ?></h3>
+    
+    <?php if ($candidates_result->num_rows === 0): ?>
+        <p class="no-candidates">No candidates found for this election.</p>
+    <?php else: ?>
+        <div class="candidates-grid">
+            <?php while ($candidate = $candidates_result->fetch_assoc()): ?>
+                <div class="candidate-card">
+                    <div class="candidate-header">
+                        <h4><?php echo htmlspecialchars($candidate['name']); ?></h4>
+                        <span class="candidate-type <?php echo $candidate['application_type']; ?>">
+                            <?php echo ucfirst($candidate['application_type']); ?>
+                        </span>
+                    </div>
+                    
+                    <div class="candidate-photo">
+                        
+                            <img src="<?php echo $candidate['profile_photo'] ? 'uploads/' . htmlspecialchars($candidate['profile_photo']) : 'uploads/default-avatar.png'; ?>" 
+                                 alt="<?php echo htmlspecialchars($candidate['name']); ?>'s photo" 
+                                 class="candidate-image">
+                        
+                    </div>
+                    
+                    <div class="candidate-details">
+                        <p><strong>Ward:</strong> <?php echo htmlspecialchars($candidate['ward_name']); ?></p>
+                        <p><strong>Email:</strong> <?php echo htmlspecialchars($candidate['email']); ?></p>
+                        <p><strong>Phone:</strong> <?php echo htmlspecialchars($candidate['phone']); ?></p>
+                        
+                        <?php if ($candidate['application_type'] === 'party'): ?>
+                            <p><strong>Party:</strong> <?php echo htmlspecialchars($candidate['party_name']); ?></p>
+                        <?php else: ?>
+                            <p><strong>Independent Party:</strong> <?php echo htmlspecialchars($candidate['independent_party_name']); ?></p>
+                            
+                        <?php endif; ?>
+                    </div>
+                    
+                </div>
+            <?php endwhile; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<style>
+.candidates-section {
+    margin-top: 20px;
+}
+
+.candidates-section h3 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.5em;
+}
+
+.no-candidates {
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #666;
+}
+
+.candidates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.candidate-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.candidate-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.candidate-header h4 {
+    margin: 0;
+    color: #333;
+}
+
+.candidate-type {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.candidate-type.party {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+.candidate-type.independent {
+    background-color: #fff3e0;
+    color: #e65100;
+}
+
+.candidate-details p {
+    margin: 8px 0;
+    color: #555;
+}
+
+.symbol-container {
+    margin-top: 10px;
+}
+
+.party-symbol {
+    max-width: 100px;
+    max-height: 100px;
+    margin-top: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.approval-status {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.status-label {
+    font-weight: 500;
+    color: #555;
+}
+
+.status-value {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.status-value.approved {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-value.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-value.rejected {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.error-message {
+    color: #dc3545;
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.candidate-photo {
+    text-align: center;
+    margin: 15px auto;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.candidate-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+}
+
+.candidate-image:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    .candidate-photo {
+        width: 150px;
+        height: 150px;
+    }
+}
+</style>

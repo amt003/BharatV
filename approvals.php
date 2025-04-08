@@ -38,11 +38,6 @@ $approvedVotersQuery = "SELECT u.*, w.ward_name as ward_name
                         AND u.approved_by_admin = 1";
 $approvedVoters = $conn->query($approvedVotersQuery);
 
-
-error_log("Debug: Pending voters: " . ($pendingVoters ? $pendingVoters->num_rows : 'query failed'));
-error_log("Debug: Pending candidates: " . ($pendingCandidates ? $pendingCandidates->num_rows : 'query failed'));
-error_log("Debug: Approved voters: " . ($approvedVoters ? $approvedVoters->num_rows : 'query failed'));
-error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandidates->num_rows : 'query failed'));
 ?>
 
 <!DOCTYPE html>
@@ -61,10 +56,18 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 15px;
+        }
+
         .approval-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            min-width: 800px; /* Ensures table doesn't get too compressed */
         }
 
         .approval-table th,
@@ -72,6 +75,7 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
             padding: 12px;
             border: 1px solid #ddd;
             text-align: left;
+            white-space: nowrap;
         }
 
         .approval-table th {
@@ -141,6 +145,23 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
             font-family: monospace;
         }
 
+        /* Responsive styling for mobile devices */
+        @media screen and (max-width: 768px) {
+            .approval-section {
+                margin: 10px;
+                padding: 15px;
+            }
+            
+            .btn {
+                padding: 5px 10px;
+                font-size: 12px;
+            }
+            
+            .approval-table th,
+            .approval-table td {
+                padding: 8px;
+            }
+        }
      
     </style>
 </head>
@@ -181,42 +202,46 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
     <div class="approval-section">
         <h2>Pending Candidate Approvals</h2>
         <?php if ($pendingCandidates && $pendingCandidates->num_rows > 0): ?>
-            <table class="approval-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Ward</th>
-                        <th>Aadhaar Number</th>
-                        <th>Documents</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($candidate = $pendingCandidates->fetch_assoc()): ?>
+            <div class="table-responsive">
+                <table class="approval-table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($candidate['name']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['email']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['phone']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['ward_name']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['aadhaar_number']); ?></td>
-                            <td>
-                                <a href="<?php echo htmlspecialchars($candidate['aadhaar_file']); ?>" 
-                                   class="view-doc" target="_blank">View Aadhaar</a>
-                            </td>
-                            <td>
-                                <form method="POST" class="approval-form">
-                                    <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($candidate['id']); ?>">
-                                    <input type="hidden" name="action" value="">
-                                    <button type="button" class="btn btn-approve" data-action="approve">Approve</button>
-                                    <button type="button" class="btn btn-reject" data-action="reject">Reject</button>
-                                </form>
-                            </td>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhaar Number</th>
+                            <th>Documents</th>
+                            <th>Actions</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php while ($candidate = $pendingCandidates->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($candidate['name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['email']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['aadhaar_number']); ?></td>
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($candidate['aadhaar_file']); ?>" 
+                                       class="view-doc" target="_blank">View Aadhaar</a>
+                                    <a href="<?php echo htmlspecialchars($candidate['voter_id_proof']); ?>" 
+                                        class="view-doc" target="_blank">View Voter ID</a>
+                                </td>
+                                <td>
+                                    <form method="POST" class="approval-form">
+                                        <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($candidate['id']); ?>">
+                                        <input type="hidden" name="action" value="">
+                                        <button type="button" class="btn btn-approve" data-action="approve">Approve</button>
+                                        <button type="button" class="btn btn-reject" data-action="reject">Reject</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <p>No pending candidate approvals<?php echo $pendingCandidates === false ? ' (Error loading data)' : ''; ?>.</p>
         <?php endif; ?>
@@ -226,43 +251,47 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
     <div class="approval-section">
         <h2>Pending Voter Approvals</h2>
         <?php if ($pendingVoters && $pendingVoters->num_rows > 0): ?>
-            <table class="approval-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Ward</th>
-                        <th>Aadhar Number</th>
-                        <th>Documents</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($voter = $pendingVoters->fetch_assoc()): ?>
+            <div class="table-responsive">
+                <table class="approval-table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($voter['name']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['email']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['phone']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['ward_name']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['aadhaar_number']); ?></td>
-
-                            <td>
-                                <a href="<?php echo htmlspecialchars($voter['aadhaar_file']); ?>" 
-                                   class="view-doc" target="_blank">View Aadhaar</a>
-                            </td>
-                            <td>
-                                <form method="POST" class="approval-form">
-                                    <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($voter['id']); ?>">
-                                    <input type="hidden" name="action" value="">
-                                    <button type="button" class="btn btn-approve" data-action="approve">Approve</button>
-                                    <button type="button" class="btn btn-reject" data-action="reject">Reject</button>
-                                </form>
-                            </td>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhar Number</th>
+                            <th>Documents</th>
+                            <th>Actions</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php while ($voter = $pendingVoters->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($voter['name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['email']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['aadhaar_number']); ?></td>
+
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($voter['aadhaar_file']); ?>" 
+                                       class="view-doc" target="_blank">View Aadhaar</a>
+                                    <a href="<?php echo htmlspecialchars($voter['voter_id_proof']); ?>"  
+                                       class="view-doc" target="_blank">View Voter ID</a>
+                                </td>
+                                <td>
+                                    <form method="POST" class="approval-form">
+                                        <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($voter['id']); ?>">
+                                        <input type="hidden" name="action" value="">
+                                        <button type="button" class="btn btn-approve" data-action="approve">Approve</button>
+                                        <button type="button" class="btn btn-reject" data-action="reject">Reject</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <p>No pending voter approvals<?php echo $pendingVoters === false ? ' (Error loading data)' : ''; ?>.</p>
         <?php endif; ?>
@@ -272,37 +301,41 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
     <div class="approval-section">
         <h2>Approved Candidates</h2>
         <?php if ($approvedCandidates && $approvedCandidates->num_rows > 0): ?>
-            <table class="approval-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Ward</th>
-                        <th>Aadhaar Number</th>
-                        <th>Documents</th>
-                        <th>Approval Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($candidate = $approvedCandidates->fetch_assoc()): ?>
+            <div class="table-responsive">
+                <table class="approval-table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($candidate['name']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['email']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['phone']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['ward_name']); ?></td>
-                            <td><?php echo htmlspecialchars($candidate['aadhaar_number']); ?></td>
-                            <td>
-                                <a href="<?php echo htmlspecialchars($candidate['aadhaar_file']); ?>" 
-                                   class="view-doc" target="_blank">View Aadhaar</a>
-                            </td>
-                            <td>
-                                <span class="badge badge-success">Approved</span>
-                            </td>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhaar Number</th>
+                            <th>Documents</th>
+                            <th>Approval Status</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php while ($candidate = $approvedCandidates->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($candidate['name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['email']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($candidate['aadhaar_number']); ?></td>
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($candidate['aadhaar_file']); ?>" 
+                                       class="view-doc" target="_blank">View Aadhaar</a>
+                                    <a href="<?php echo htmlspecialchars($candidate['voter_id_proof']); ?>" 
+                                       class="view-doc" target="_blank">View Voter ID</a>
+                                </td>
+                                <td>
+                                    <span class="badge badge-success">Approved</span>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <p>No approved candidates found<?php echo $approvedCandidates === false ? ' (Error loading data)' : ''; ?>.</p>
         <?php endif; ?>
@@ -312,61 +345,63 @@ error_log("Debug: Approved candidates: " . ($approvedCandidates ? $approvedCandi
     <div class="approval-section">
         <h2>Approved Voters</h2>
         <?php if ($approvedVoters && $approvedVoters->num_rows > 0): ?>
-            <table class="approval-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Ward</th>
-                        <th>Aadhaar Number</th>
-                        <th>Documents</th>
-                        <th>Approval Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($voter = $approvedVoters->fetch_assoc()): ?>
+            <div class="table-responsive">
+                <table class="approval-table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($voter['name']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['email']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['phone']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['ward_name']); ?></td>
-                            <td><?php echo htmlspecialchars($voter['aadhaar_number']); ?></td>
-                            <td>
-                                <a href="<?php echo htmlspecialchars($voter['aadhaar_file']); ?>" 
-                                   class="view-doc" target="_blank">View Aadhaar</a>
-                            </td>
-                            <td>
-                                <span class="badge badge-success">Approved</span>
-                            </td>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Ward</th>
+                            <th>Aadhaar Number</th>
+                            <th>Documents</th>
+                            <th>Approval Status</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php while ($voter = $approvedVoters->fetch_assoc()): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($voter['name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['email']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['phone']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['ward_name']); ?></td>
+                                <td><?php echo htmlspecialchars($voter['aadhaar_number']); ?></td>
+                                <td>
+                                    <a href="<?php echo htmlspecialchars($voter['aadhaar_file']); ?>" 
+                                       class="view-doc" target="_blank">View Aadhaar</a>
+                                    <a href="<?php echo htmlspecialchars($voter['voter_id_proof']); ?>" 
+                                       class="view-doc" target="_blank">View Voter ID</a>
+                                </td>
+                                <td>
+                                    <span class="badge badge-success">Approved</span>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <p>No approved voters found<?php echo $approvedVoters === false ? ' (Error loading data)' : ''; ?>.</p>
         <?php endif; ?>
     </div>
 
-    <script>
-        // Confirm before rejecting
-        document.querySelectorAll('.btn-reject').forEach(button => {
-            button.addEventListener('click', function(e) {
-                if (!confirm('Are you sure you want to reject this user?')) {
-                    e.preventDefault();
-                }
-            });
-        });
+    <!-- Rejection Reason Modal -->
+    <div id="rejectionModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
+        <div class="modal-content" style="background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 50%; max-width: 500px; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <span class="close" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+            <h3 style="margin-bottom: 20px; color: #333;">Rejection Reason</h3>
+            <p style="margin-bottom: 15px;">Please provide a reason for rejecting this user. This reason will be displayed on the user's status page:</p>
+            <textarea id="rejectionReason" style="width: 100%; padding: 10px; margin-bottom: 15px; min-height: 100px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            <div style="text-align: right;">
+                <button id="cancelRejection" style="background-color: #ccc; border: none; color: black; padding: 8px 16px; margin-right: 10px; border-radius: 4px; cursor: pointer;">Cancel</button>
+                <button id="confirmRejection" style="background-color: #f44336; border: none; color: white; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Reject User</button>
+            </div>
+        </div>
+    </div>
 
-        // Add error logging to form submissions
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                console.log('Form submitted:', {
-                    action: this.querySelector('[name="action"]').value,
-                    userId: this.querySelector('[name="user_id"]').value
-                });
-            });
-        });
+    <script>
+        // Remove all event listener code that has been moved to admin.php
+        // The admin.php now handles all these functions
     </script>
 </body>
 </html>

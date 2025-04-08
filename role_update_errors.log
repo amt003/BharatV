@@ -1,0 +1,80 @@
+[07-Apr-2025 16:27:16 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:27:16 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:27:21 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:27:21 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:27:24 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:27:24 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:27:48 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:27:48 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:32:28 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:32:28 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:33:12 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:33:12 Europe/Berlin] No candidates found matching the criteria
+[07-Apr-2025 16:36:31 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[07-Apr-2025 16:36:31 Europe/Berlin] No candidates found matching the criteria
+[08-Apr-2025 02:20:38 Europe/Berlin] Executing query: SELECT DISTINCT u.id, u.name, e.election_id, e.Election_title, e.end_date, e.result_status, e.status, e.results_published_date
+                  FROM users u 
+                  JOIN contesting_candidates cc ON cc.id = u.id 
+                  JOIN elections e ON cc.election_id = e.election_id 
+                  WHERE u.role = 'candidate' 
+                  AND e.result_status = 'published' 
+                  AND e.status = 'completed'
+                  AND e.results_published_date IS NOT NULL
+                  AND DATEDIFF(CURDATE(), e.results_published_date) >= 2
+[08-Apr-2025 02:20:38 Europe/Berlin] No candidates found matching the criteria

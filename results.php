@@ -258,7 +258,6 @@ $elections = $stmt->get_result();
     font-size: 1em;
     font-weight: bold;
     box-shadow: 0 3px 8px rgba(0,0,0,0.2);
-    transform: rotate(5deg);
     z-index: 1;
 }
 

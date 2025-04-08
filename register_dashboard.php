@@ -92,6 +92,48 @@ function uploadAadhaarFile($file) {
   return ["error" => "File upload failed"];
 }
 
+function uploadVoterIdFile($file) {
+    // Check if uploads directory exists and create if not
+    $target_dir = "uploads/";
+    if (!file_exists($target_dir)) {
+        mkdir($target_dir, 0755, true);
+    }
+    
+    // Validate file presence
+    if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+        return ["error" => "No file uploaded or upload error occurred"];
+    }
+    
+    // Generate safe filename
+    $file_extension = strtolower(pathinfo($file["name"], PATHINFO_EXTENSION));
+    $unique_filename = uniqid() . '_voter_id_' . md5(basename($file["name"])) . '.' . $file_extension;
+    $target_file = $target_dir . $unique_filename;
+    
+    // Check file size (5MB limit)
+    if ($file["size"] > 5000000) {
+        return ["error" => "File size must be less than 5MB"];
+    }
+    
+    // Validate file type using both extension and MIME type
+    $allowed_types = ["pdf"];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime_type = finfo_file($finfo, $file["tmp_name"]);
+    finfo_close($finfo);
+    
+    if (!in_array($file_extension, $allowed_types) || $mime_type !== 'application/pdf') {
+        return ["error" => "Only PDF files are allowed"];
+    }
+    
+    // Move uploaded file with additional security checks
+    if (move_uploaded_file($file["tmp_name"], $target_file)) {
+        // Set proper permissions
+        chmod($target_file, 0644);
+        return ["path" => $target_file];
+    }
+    
+    return ["error" => "File upload failed"];
+}
+
 // Function to generate OTP
 function generateOTP() {
     return sprintf("%06d", mt_rand(100000, 999999));
@@ -102,14 +144,18 @@ function sendVerificationEmail($email, $name, $otp) {
     $mail = new PHPMailer(true);
     try {
         // Server settings
-        $mail->SMTPDebug = 0;
+        $mail->SMTPDebug = 0; // Change from 2 to 0 to disable debug output
         $mail->isSMTP();
         $mail->Host = 'smtp.gmail.com';
         $mail->SMTPAuth = true;
         $mail->Username = 'bharatv2k25@gmail.com';
-        $mail->Password = 'ntty itsx jfbg wvzo';
+        $mail->Password = 'tzvp bxrs pewb vdcc'; // App password
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = 587;
+        
+        // Add timeout settings
+        $mail->Timeout = 60; // seconds
+        $mail->SMTPKeepAlive = true;
 
         // Recipients
         $mail->setFrom('bharatv2k25@gmail.com', 'bharatv');
@@ -133,16 +179,20 @@ function sendVerificationEmail($email, $name, $otp) {
             </body>
             </html>";
 
-        $mail->send();
+        $result = $mail->send();
+        error_log("Email sent successfully to $email");
         return true;
     } catch (Exception $e) {
-        error_log("Email sending failed. Mailer Error: {$mail->ErrorInfo}");
+        error_log("Email sending failed to $email. Error: {$mail->ErrorInfo}");
         return false;
     }
 }
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Start output buffering to prevent header issues
+    ob_start();
+    
     $errors = [];
     
     // Sanitize inputs
@@ -155,6 +205,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $ward_id = sanitizeInput($_POST['ward_id']);
+    
+    // Check if user with this email already exists
+    $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $errors['email'] = "A user with this email already exists. Please use a different email or login.";
+    }
+    
+    // Check if user with this Aadhaar number already exists
+    $stmt = $conn->prepare("SELECT id FROM users WHERE aadhaar_number = ?");
+    $stmt->bind_param("s", $aadhaar_number);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $errors['aadhaar_number'] = "A user with this Aadhaar number already exists. Please use a different Aadhaar number or login.";
+    }
     
     // Validate inputs
     if (empty($name)) $errors['name'] = "Name is required";
@@ -179,10 +247,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors['aadhaar_file'] = $aadhaar_file_result['error'];
     }
     
+    // Handle voter ID file upload
+    $voter_id_file_result = uploadVoterIdFile($_FILES['voter_id_file']);
+    if (isset($voter_id_file_result['error'])) {
+        $errors['voter_id_file'] = $voter_id_file_result['error'];
+    }
+    
     if (empty($errors)) {
         // Hash password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         $aadhaar_file_path = $aadhaar_file_result['path'];
+        $voter_id_file_path = $voter_id_file_result['path'];
         
         // Set role based on form type
         $role = ($_POST['form_type'] === 'candidate') ? 'candidate' : 'voter';
@@ -196,6 +271,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             'role' => $role,
             'aadhaar_number' => $aadhaar_number,
             'aadhaar_file' => $aadhaar_file_path,
+            'voter_id_file' => $voter_id_file_path,
             'address' => $address,
             'phone' => $phone,
             'ward_id' => $ward_id,
@@ -206,12 +282,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Send verification email
         if (sendVerificationEmail($email, $name, $otp)) {
+            // Ensure all output is flushed before redirecting
+            ob_end_clean();
             header("Location: verify_email.php");
             exit();
         } else {
-            $errors['email'] = "Failed to send verification email. Please try again.";
+            $errors['email_verification'] = "Failed to send verification email. Please check your email address or try again later.";
         }
     }
+    
+    // End output buffering if we didn't redirect
+    if (ob_get_length()) ob_end_flush();
 }
 
 $conn->close();
@@ -246,7 +327,7 @@ $conn->close();
         }
 
         .header {
-            background: linear-gradient(135deg, #f5f7fa 100%);
+            background: linear-gradient(135deg, white 100%);
             padding: 15px;
             display: flex;
             justify-content: center;
@@ -303,57 +384,71 @@ $conn->close();
         }
 
         .form-group {
-            margin-bottom: 16px;
-            display: flex;
-            gap: 16px;
+            margin-bottom: 20px;
+            position: relative;
         }
 
         .form-group label {
-            flex: 1;
             display: block;
-            font-size: 18px;
+            margin-bottom: 8px;
             font-weight: 500;
-            color: black;
+            color: #333;
         }
 
-        input,
-        textarea,
-        select {
-            flex: 2;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-
-        input:focus,
-        textarea:focus,
-        select:focus {
-            outline: none;
-            border-color: orange;
-            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
-        }
-
-        button[type="submit"] {
-            background: green;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
             width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s ease;
         }
 
-        button[type="submit"]:hover {
-            background: rgb(42, 189, 12);
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+            outline: none;
+        }
+
+        .form-group input.error,
+        .form-group textarea.error,
+        .form-group select.error {
+            border-color: #dc3545;
         }
 
         .error {
-            color: red;
-            font-size: 14px;
+            color: #dc3545;
+            font-size: 12px;
             margin-top: 5px;
+            display: block;
+            padding-left: 5px;
+        }
+
+        .error-summary {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-container {
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .required-field::after {
+            content: "*";
+            color: #dc3545;
+            margin-left: 4px;
         }
 
         .login-link {
@@ -371,6 +466,22 @@ $conn->close();
         transform: translateY(0);
     }
 }
+
+        button[type="submit"] {
+            background: green;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        button[type="submit"]:hover {
+            background: rgb(42, 189, 12);
+        }
     </style>
 </head>
 <body>
@@ -379,7 +490,8 @@ $conn->close();
 // Validation rules for all form fields
 const validationRules = {
     name: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             const regex = /^[a-zA-Z\s]{3,50}$/;
             return {
                 isValid: regex.test(value),
@@ -388,7 +500,8 @@ const validationRules = {
         }
     },
     dob: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             const inputDate = new Date(value);
             const today = new Date();
             const minAgeDate = new Date(
@@ -403,7 +516,8 @@ const validationRules = {
         }
     },
     email: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return {
                 isValid: regex.test(value),
@@ -412,16 +526,18 @@ const validationRules = {
         }
     },
     phone: {
-    validate: (value) => {
-        const regex = /^[6789]\d{9}$/;  // Must start with 6 or 7 or 8 or 9 and have 10 digits total
-        return {
-            isValid: regex.test(value),
-            message: 'Phone number must be 10 digits and start with 6 or 7 or 8 or 9'
-        };
-    }
-},
+        validate: (input) => {
+            const value = input.value;
+            const regex = /^[6789]\d{9}$/;
+            return {
+                isValid: regex.test(value),
+                message: 'Phone number must be 10 digits and start with 6 or 7 or 8 or 9'
+            };
+        }
+    },
     address: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             return {
                 isValid: value.trim().length >= 5,
                 message: 'Address must be at least 5 characters long'
@@ -429,7 +545,8 @@ const validationRules = {
         }
     },
     ward_id: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             return {
                 isValid: value !== '',
                 message: 'Please select a ward'
@@ -437,7 +554,8 @@ const validationRules = {
         }
     },
     aadhaar_number: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             const regex = /^\d{12}$/;
             return {
                 isValid: regex.test(value),
@@ -446,43 +564,41 @@ const validationRules = {
         }
     },
     aadhaar_file: {
-    validate: (fileInput) => {
-        // Clear any existing error first
-        clearError(fileInput);
-        
-        if (!fileInput.files || !fileInput.files[0]) {
+        validate: (input) => {
+            if (!input.files || !input.files[0]) {
+                return {
+                    isValid: false,
+                    message: 'Please select a file'
+                };
+            }
+            
+            const file = input.files[0];
+            const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB
+            const isValidType = file.type === 'application/pdf';
+            
+            if (!isValidSize) {
+                return {
+                    isValid: false,
+                    message: 'File size must be less than 5MB'
+                };
+            }
+            
+            if (!isValidType) {
+                return {
+                    isValid: false,
+                    message: 'Only PDF files are allowed'
+                };
+            }
+            
             return {
-                isValid: false,
-                message: 'Please select a file'
+                isValid: true,
+                message: ''
             };
         }
-        
-        const file = fileInput.files[0];
-        const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB
-        const isValidType = file.type === 'application/pdf';
-        
-        if (!isValidSize) {
-            return {
-                isValid: false,
-                message: 'File size must be less than 5MB'
-            };
-        }
-        
-        if (!isValidType) {
-            return {
-                isValid: false,
-                message: 'Only PDF files are allowed'
-            };
-        }
-        
-        return {
-            isValid: true,
-            message: ''
-        };
-    }
-},
+    },
     password: {
-        validate: (value) => {
+        validate: (input) => {
+            const value = input.value;
             const hasMinLength = value.length >= 6;
             const hasUpperCase = /[A-Z]/.test(value);
             const hasLowerCase = /[a-z]/.test(value);
@@ -497,11 +613,45 @@ const validationRules = {
         }
     },
     confirm_password: {
-        validate: (value, form) => {
+        validate: (input, form) => {
+            const value = input.value;
             const password = form.querySelector('[name="password"]').value;
             return {
                 isValid: value === password,
                 message: 'Passwords do not match'
+            };
+        }
+    },
+    voter_id_file: {
+        validate: (input) => {
+            if (!input.files || !input.files[0]) {
+                return {
+                    isValid: false,
+                    message: 'Please select a file'
+                };
+            }
+            
+            const file = input.files[0];
+            const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB
+            const isValidType = file.type === 'application/pdf';
+            
+            if (!isValidSize) {
+                return {
+                    isValid: false,
+                    message: 'File size must be less than 5MB'
+                };
+            }
+            
+            if (!isValidType) {
+                return {
+                    isValid: false,
+                    message: 'Only PDF files are allowed'
+                };
+            }
+            
+            return {
+                isValid: true,
+                message: ''
             };
         }
     }
@@ -509,7 +659,16 @@ const validationRules = {
 
 // Function to show error message
 function showError(input, message) {
+    if (!(input instanceof Element)) {
+        console.error('Invalid input element');
+        return;
+    }
     const formGroup = input.closest('.form-group');
+    if (!formGroup) {
+        console.error('No form-group parent found');
+        return;
+    }
+    
     let errorDiv = formGroup.querySelector('.error');
     
     if (!errorDiv) {
@@ -524,7 +683,16 @@ function showError(input, message) {
 
 // Function to clear error message
 function clearError(input) {
+    if (!(input instanceof Element)) {
+        console.error('Invalid input element');
+        return;
+    }
     const formGroup = input.closest('.form-group');
+    if (!formGroup) {
+        console.error('No form-group parent found');
+        return;
+    }
+    
     const errorDiv = formGroup.querySelector('.error');
     
     if (errorDiv) {
@@ -536,12 +704,18 @@ function clearError(input) {
 
 // Function to validate a single input
 function validateInput(input) {
+    if (!(input instanceof Element)) {
+        console.error('Invalid input element');
+        return false;
+    }
+    
     const name = input.name;
+    const formType = input.form.id === 'candidate-form' ? 'candidate' : 'voter';
     const rule = validationRules[name];
     
     if (!rule) return true; // Skip if no validation rule exists
     
-    const result = rule.validate(input.value, input.form);
+    const result = rule.validate(input, input.form);
     
     if (!result.isValid) {
         showError(input, result.message);
@@ -557,6 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('#candidate-form, #voter-form');
     
     forms.forEach(form => {
+        const formType = form.id === 'candidate-form' ? 'candidate' : 'voter';
         const inputs = form.querySelectorAll('input, select, textarea');
         
         // Add validation on input/change
@@ -585,6 +760,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Update the email verification code to work with both forms
+document.querySelectorAll('#candidate-form, #voter-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = this.querySelector('[name="email"]').value;
+        sendVerificationEmail(email);
+    });
+});
+
 function sendVerificationEmail(email) {
     fetch('send_reset_otp.php', {
         method: 'POST',
@@ -606,13 +790,6 @@ function sendVerificationEmail(email) {
         alert('Error sending verification email');
     });
 }
-
-// Add this to your form submit handler
-document.querySelector('form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const email = this.querySelector('[name="email"]').value;
-    sendVerificationEmail(email);
-});
   </script>
     <div class="header">
        <a href="home.php"> <img src="assets/logo.jpg" alt="Company Logo"></a>
@@ -625,96 +802,109 @@ document.querySelector('form').addEventListener('submit', function(e) {
                 <button class="tab" onclick="showForm('voter')">Voter Registration</button>
             </div>
 
+            <?php if (!empty($errors) && isset($errors['email_verification'])): ?>
+            <div class="error-summary">
+                <?php echo htmlspecialchars($errors['email_verification']); ?>
+            </div>
+            <?php endif; ?>
+
             <!-- Candidate Form -->
             <form id="candidate-form" class="form-container" method="post" enctype="multipart/form-data" style="display: block">
                 <h2>Candidate Registration</h2>
                 <input type="hidden" name="form_type" value="candidate" />
 
                 <div class="form-group">
-                    <label for="name">Full Name*</label>
-                    <input type="text" id="name" name="name" />
+                    <label for="candidate_name" class="required-field">Full Name</label>
+                    <input type="text" id="candidate_name" name="name" class="<?php echo isset($errors['name']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['name'])) : ?>
-                        <div class="error"><?php echo $errors['name']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['name']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="dob">Date of Birth*</label>
-                    <input type="date" id="dob" name="dob" />
+                    <label for="candidate_dob" class="required-field">Date of Birth</label>
+                    <input type="date" id="candidate_dob" name="dob" class="<?php echo isset($errors['dob']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['dob'])) : ?>
-                        <div class="error"><?php echo $errors['dob']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['dob']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email Address*</label>
-                    <input type="email" id="email" name="email" />
+                    <label for="candidate_email" class="required-field">Email Address</label>
+                    <input type="email" id="candidate_email" name="email" class="<?php echo isset($errors['email']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['email'])) : ?>
-                        <div class="error"><?php echo $errors['email']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['email']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="phone">Phone Number*</label>
-                    <input type="tel" id="phone" name="phone" />
+                    <label for="candidate_phone" class="required-field">Phone Number</label>
+                    <input type="tel" id="candidate_phone" name="phone" class="<?php echo isset($errors['phone']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['phone'])) : ?>
-                        <div class="error"><?php echo $errors['phone']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['phone']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="address">Address*</label>
-                    <textarea id="address" name="address" rows="3"></textarea>
+                    <label for="candidate_address" class="required-field">Address</label>
+                    <textarea id="candidate_address" name="address" rows="3" class="<?php echo isset($errors['address']) ? 'error' : ''; ?>"></textarea>
                     <?php if (isset($errors['address'])) : ?>
-                        <div class="error"><?php echo $errors['address']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['address']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-    <label for="ward_id">Ward*</label>
-    <select id="ward_id" name="ward_id">
-        <option value="">Select</option>
-        <?php foreach($wards as $ward): ?>
-            <option value="<?php echo htmlspecialchars($ward['ward_id']); ?>">
-                <?php echo htmlspecialchars($ward['ward_name']); ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-    <?php if (isset($errors['ward_id'])) : ?>
-        <div class="error"><?php echo $errors['ward_id']; ?></div>
-    <?php endif; ?>
-</div>
-
+                    <label for="candidate_ward_id" class="required-field">Ward</label>
+                    <select id="candidate_ward_id" name="ward_id" class="<?php echo isset($errors['ward_id']) ? 'error' : ''; ?>">
+                        <option value="">Select Ward</option>
+                        <?php foreach($wards as $ward): ?>
+                            <option value="<?php echo htmlspecialchars($ward['ward_id']); ?>">
+                                <?php echo htmlspecialchars($ward['ward_name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if (isset($errors['ward_id'])) : ?>
+                        <span class="error"><?php echo htmlspecialchars($errors['ward_id']); ?></span>
+                    <?php endif; ?>
+                </div>
 
                 <div class="form-group">
-                    <label for="aadhaar_number">Aadhaar Number*</label>
-                    <input type="text" id="aadhaar_number" name="aadhaar_number" maxlength="12" />
+                    <label for="candidate_aadhaar_number" class="required-field">Aadhaar Number</label>
+                    <input type="text" id="candidate_aadhaar_number" name="aadhaar_number" maxlength="12" class="<?php echo isset($errors['aadhaar_number']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['aadhaar_number'])) : ?>
-                        <div class="error"><?php echo $errors['aadhaar_number']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['aadhaar_number']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="aadhaar_file">Aadhaar Proof *</label>
-                    <input type="file" id="aadhaar_file" name="aadhaar_file" />
+                    <label for="candidate_aadhaar_file" class="required-field">Aadhaar Proof</label>
+                    <input type="file" id="candidate_aadhaar_file" name="aadhaar_file" class="<?php echo isset($errors['aadhaar_file']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['aadhaar_file'])) : ?>
-                        <div class="error"><?php echo $errors['aadhaar_file']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['aadhaar_file']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password*</label>
-                    <input type="password" id="password" name="password" />
+                    <label for="candidate_voter_id_file" class="required-field">Voter ID Proof</label>
+                    <input type="file" id="candidate_voter_id_file" name="voter_id_file" class="<?php echo isset($errors['voter_id_file']) ? 'error' : ''; ?>" />
+                    <?php if (isset($errors['voter_id_file'])) : ?>
+                        <span class="error"><?php echo htmlspecialchars($errors['voter_id_file']); ?></span>
+                    <?php endif; ?>
+                </div>
+
+                <div class="form-group">
+                    <label for="candidate_password" class="required-field">Password</label>
+                    <input type="password" id="candidate_password" name="password" class="<?php echo isset($errors['password']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['password'])) : ?>
-                        <div class="error"><?php echo $errors['password']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['password']); ?></span>
                     <?php endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label for="confirm_password">Confirm Password*</label>
-                    <input type="password" id="confirm_password" name="confirm_password" />
+                    <label for="candidate_confirm_password" class="required-field">Confirm Password</label>
+                    <input type="password" id="candidate_confirm_password" name="confirm_password" class="<?php echo isset($errors['confirm_password']) ? 'error' : ''; ?>" />
                     <?php if (isset($errors['confirm_password'])) : ?>
-                        <div class="error"><?php echo $errors['confirm_password']; ?></div>
+                        <span class="error"><?php echo htmlspecialchars($errors['confirm_password']); ?></span>
                     <?php endif; ?>
                 </div>
 
@@ -730,48 +920,48 @@ document.querySelector('form').addEventListener('submit', function(e) {
         <input type="hidden" name="form_type" value="voter" />
 
         <div class="form-group">
-          <label for="name">Full Name*</label>
-          <input type="text" id="name" name="name" />
+          <label for="voter_name" class="required-field">Full Name</label>
+          <input type="text" id="voter_name" name="name" class="<?php echo isset($errors['name']) ? 'error' : ''; ?>" />
           <?php if (isset($errors['name'])) : ?>
-          <div class="error"><?php echo $errors['name']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['name']); ?></span>
           <?php endif; ?>
         </div>
 
         <div class="form-group">
-        <label for="dob">Date of Birth*</label>
-        <input type="date" id="dob" name="dob" />
+        <label for="voter_dob" class="required-field">Date of Birth</label>
+        <input type="date" id="voter_dob" name="dob" class="<?php echo isset($errors['dob']) ? 'error' : ''; ?>" />
         <?php if (isset($errors['dob'])) : ?>
-        <div class="error"><?php echo $errors['dob']; ?></div>
+        <span class="error"><?php echo htmlspecialchars($errors['dob']); ?></span>
         <?php endif; ?>
         </div>
 
         <div class="form-group">
-          <label for="email">Email Address*</label>
-          <input type="email" id="email" name="email" />
+          <label for="voter_email" class="required-field">Email Address</label>
+          <input type="email" id="voter_email" name="email" class="<?php echo isset($errors['email']) ? 'error' : ''; ?>" />
           <?php if (isset($errors['email'])) : ?>
-          <div class="error"><?php echo $errors['email']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['email']); ?></span>
           <?php endif; ?>
         </div>
 
         <div class="form-group">
-          <label for="phone">Phone Number*</label>
-          <input type="tel" id="phone" name="phone" />
+          <label for="voter_phone" class="required-field">Phone Number</label>
+          <input type="tel" id="voter_phone" name="phone" class="<?php echo isset($errors['phone']) ? 'error' : ''; ?>" />
           <?php if (isset($errors['phone'])) : ?>
-          <div class="error"><?php echo $errors['phone']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['phone']); ?></span>
           <?php endif; ?>
         </div>
 
         <div class="form-group">
-          <label for="address">Address*</label>
-          <textarea id="address" name="address" rows="3"></textarea>
+          <label for="voter_address" class="required-field">Address</label>
+          <textarea id="voter_address" name="address" rows="3" class="<?php echo isset($errors['address']) ? 'error' : ''; ?>"></textarea>
           <?php if (isset($errors['address'])) : ?>
-          <div class="error"><?php echo $errors['address']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['address']); ?></span>
           <?php endif; ?>
         </div>
         <div class="form-group">
-    <label for="ward_id">Ward*</label>
-    <select id="ward_id" name="ward_id">
-        <option value="">Select</option>
+    <label for="voter_ward_id" class="required-field">Ward</label>
+    <select id="voter_ward_id" name="ward_id" class="<?php echo isset($errors['ward_id']) ? 'error' : ''; ?>">
+        <option value="">Select Ward</option>
         <?php foreach($wards as $ward): ?>
             <option value="<?php echo htmlspecialchars($ward['ward_id']); ?>">
                 <?php echo htmlspecialchars($ward['ward_name']); ?>
@@ -779,39 +969,47 @@ document.querySelector('form').addEventListener('submit', function(e) {
         <?php endforeach; ?>
     </select>
     <?php if (isset($errors['ward_id'])) : ?>
-        <div class="error"><?php echo $errors['ward_id']; ?></div>
+        <span class="error"><?php echo htmlspecialchars($errors['ward_id']); ?></span>
     <?php endif; ?>
 </div>
 
         <div class="form-group">
-          <label for="aadhaar_number">Aadhaar Number*</label>
-          <input type="text" id="aadhaar_number" name="aadhaar_number" maxlength="12" />
+          <label for="voter_aadhaar_number" class="required-field">Aadhaar Number</label>
+          <input type="text" id="voter_aadhaar_number" name="aadhaar_number" maxlength="12" class="<?php echo isset($errors['aadhaar_number']) ? 'error' : ''; ?>" />
           <?php if (isset($errors['aadhaar_number'])) : ?>
-          <div class="error"><?php echo $errors['aadhaar_number']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['aadhaar_number']); ?></span>
           <?php endif; ?>
         </div>
 
         <div class="form-group">
-          <label for="aadhaar_file">Aadhaar Proof*</label>
-          <input type="file" id="aadhaar_file" name="aadhaar_file" class="file-input" />
+          <label for="voter_aadhaar_file" class="required-field">Aadhaar Proof</label>
+          <input type="file" id="voter_aadhaar_file" name="aadhaar_file" class="<?php echo isset($errors['aadhaar_file']) ? 'error' : ''; ?>" />
           <?php if (isset($errors['aadhaar_file'])) : ?>
-          <div class="error"><?php echo $errors['aadhaar_file']; ?></div>
+          <span class="error"><?php echo htmlspecialchars($errors['aadhaar_file']); ?></span>
           <?php endif; ?>
         </div>
 
         <div class="form-group">
-            <label for="password">Add Password*</label>
-            <input type="password" id="password" name="password" />
+            <label for="voter_voter_id_file" class="required-field">Voter ID Proof</label>
+            <input type="file" id="voter_voter_id_file" name="voter_id_file" class="<?php echo isset($errors['voter_id_file']) ? 'error' : ''; ?>" />
+            <?php if (isset($errors['voter_id_file'])) : ?>
+                <span class="error"><?php echo htmlspecialchars($errors['voter_id_file']); ?></span>
+            <?php endif; ?>
+        </div>
+
+        <div class="form-group">
+            <label for="voter_password" class="required-field">Add Password</label>
+            <input type="password" id="voter_password" name="password" class="<?php echo isset($errors['password']) ? 'error' : ''; ?>" />
             <?php if (isset($errors['password'])) : ?>
-            <div class="error"><?php echo $errors['password'] ?? ''; ?></div>
+            <span class="error"><?php echo htmlspecialchars($errors['password'] ?? ''); ?></span>
           <?php endif; ?>
 
           </div>
           <div class="form-group">
-            <label for="confirm_password">Confirm Password*</label>
-            <input type="password" id="confirm_password" name="confirm_password" />
+            <label for="voter_confirm_password" class="required-field">Confirm Password</label>
+            <input type="password" id="voter_confirm_password" name="confirm_password" class="<?php echo isset($errors['confirm_password']) ? 'error' : ''; ?>" />
             <?php if (isset($errors['confirm_password'])) : ?>
-            <div class="error"><?php echo $errors['confirm_password'] ?? ''; ?></div>
+            <span class="error"><?php echo htmlspecialchars($errors['confirm_password'] ?? ''); ?></span>
           <?php endif; ?>
 
           </div>

@@ -188,10 +188,13 @@ $applications_result = $stmt->get_result();
         }
         
         .independent-candidate {
-            color: #2980b9;
+            color:  #155724;
             font-weight: 500;
         }
-        
+        .party-name {
+            color: #155724;
+            font-weight: 500;
+        }
         .application-type {
             display: inline-block;
             padding: 3px 10px;
@@ -233,10 +236,12 @@ $applications_result = $stmt->get_result();
                                         <img src="uploads/party_symbols/<?php echo htmlspecialchars($application['independent_party_symbol']); ?>" 
                                              alt="Party Symbol" 
                                              class="party-symbol">
-                                    <?php endif; ?>
+                                    <?php endif; ?>-->
                                 <?php else: ?>
+                                    <span class="party-name">
                                     <?php echo htmlspecialchars($application['party_name']); ?>
-                                <?php endif; ?> -->
+                                    </span>
+                                <?php endif; ?> 
                             </p>
 
                             <!-- Application Status Section -->

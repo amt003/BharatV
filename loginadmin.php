@@ -6,30 +6,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
     $password = $_POST['password'];
     $errors = [];
-// Validate input
-if (empty($email) || empty($password) || empty($role)) {
-  $errors['login'] = "All fields are required";
-}
-// Check for admin login
-           
-            $adminName = 'Admin';
-            $adminEmail = 'admin123@gmail.com';
-            $adminPassword = 'admin12345';
-            $adminRole = 'admin';
-
-            if ($email === $adminEmail && $password===$adminPassword) {
-      
-                    $_SESSION['user_id'] = 1;
-                    $_SESSION['name'] = $adminName;
-                    $_SESSION['role'] = $adminRole;
-                    header(header: "Location: admin.php");
-                    exit();
+    
+    // Validate input
+    if (empty($email) || empty($password)) {
+        $errors['login'] = "All fields are required";
+    } else {
+        // Check for admin login from users table
+        $stmt = $conn->prepare("SELECT id, name, email, password, role FROM users WHERE email = ? AND role = 'admin'");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 1) {
+            $admin = $result->fetch_assoc();
+            
+            // Verify the password (assuming it's stored using password_hash)
+            if (password_verify($password, $admin['password'])) {
+                // Login successful
+                $_SESSION['user_id'] = $admin['id'];
+                $_SESSION['name'] = $admin['name'];
+                $_SESSION['role'] = $admin['role'];
                 
+                // Redirect to admin dashboard
+                header("Location: admin.php");
+                exit();
             } else {
-                $errors['login'] = "Invalid admin email";
+                $errors['login'] = "Invalid password";
             }
+        } else {
+            $errors['login'] = "Invalid admin credentials";
         }
-
+        
+        $stmt->close();
+    }
+}
 
 ?>
 <!DOCTYPE html>
@@ -54,7 +64,7 @@ if (empty($email) || empty($password) || empty($role)) {
         }
 
         .header {
-            background: linear-gradient(135deg, #f5f7fa 100%);
+            background: linear-gradient(135deg white 100%);
             padding: 15px;
             display: flex;
             justify-content: center;
@@ -203,109 +213,89 @@ if (empty($email) || empty($password) || empty($role)) {
     </div>
 <script>
    document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('loginForm');
-            const emailInput = document.getElementById('email');
-            const passwordInput = document.getElementById('password');
-            const roleSelect = document.getElementById('role');
+        const form = document.getElementById('loginForm');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
 
-            // Live validation for email
-            emailInput.addEventListener('input', function() {
-                validateEmail(this);
-            });
+        // Live validation for email
+        emailInput.addEventListener('input', function() {
+            validateEmail(this);
+        });
 
-            // Live validation for password
-            passwordInput.addEventListener('input', function() {
-                validatePassword(this);
-            });
+        // Live validation for password
+        passwordInput.addEventListener('input', function() {
+            validatePassword(this);
+        });
 
-            // Live validation for role
-            roleSelect.addEventListener('change', function() {
-                validateRole(this);
-            });
+        // Form submission validation
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
 
-            // Form submission validation
-            form.addEventListener('submit', function(e) {
-                let isValid = true;
+            // Clear previous error messages
+            clearErrors();
 
-                // Clear previous error messages
-                clearErrors();
+            // Validate all fields
+            if (!validateEmail(emailInput)) isValid = false;
+            if (!validatePassword(passwordInput)) isValid = false;
 
-                // Validate all fields
-                if (!validateEmail(emailInput)) isValid = false;
-                if (!validatePassword(passwordInput)) isValid = false;
-                if (!validateRole(roleSelect)) isValid = false;
-
-                if (!isValid) {
-                    e.preventDefault();
-                }
-            });
-
-            // Validation functions
-            function validateEmail(input) {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (input.value.trim() === '') {
-                    showError(input, 'Email is required');
-                    return false;
-                } else if (!emailRegex.test(input.value)) {
-                    showError(input, 'Please enter a valid email address');
-                    return false;
-                } else {
-                    showSuccess(input);
-                    return true;
-                }
-            }
-
-            function validatePassword(input) {
-                if (input.value.trim() === '') {
-                    showError(input, 'Password is required');
-                    return false;
-                } else if (input.value.length < 6) {
-                    showError(input, 'Password must be at least 6 characters');
-                    return false;
-                } else {
-                    showSuccess(input);
-                    return true;
-                }
-            }
-
-            function validateRole(select) {
-                if (select.value === '') {
-                    showError(select, 'Please select a role');
-                    return false;
-                } else {
-                    showSuccess(select);
-                    return true;
-                }
-            }
-
-            // Helper functions
-            function showError(input, message) {
-                const formGroup = input.parentElement;
-                const errorDiv = formGroup.querySelector('.error-message') || document.createElement('div');
-                errorDiv.className = 'error-message';
-                errorDiv.innerText = message;
-                input.classList.add('error');
-                input.classList.remove('success');
-                if (!formGroup.querySelector('.error-message')) {
-                    formGroup.appendChild(errorDiv);
-                }
-            }
-
-            function showSuccess(input) {
-                const formGroup = input.parentElement;
-                const errorDiv = formGroup.querySelector('.error-message');
-                if (errorDiv) {
-                    formGroup.removeChild(errorDiv);
-                }
-                input.classList.remove('error');
-                input.classList.add('success');
-            }
-
-            function clearErrors() {
-                document.querySelectorAll('.error-message').forEach(error => error.remove());
-                document.querySelectorAll('.error').forEach(field => field.classList.remove('error'));
+            if (!isValid) {
+                e.preventDefault();
             }
         });
+
+        // Validation functions
+        function validateEmail(input) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (input.value.trim() === '') {
+                showError(input, 'Email is required');
+                return false;
+            } else if (!emailRegex.test(input.value)) {
+                showError(input, 'Please enter a valid email address');
+                return false;
+            } else {
+                showSuccess(input);
+                return true;
+            }
+        }
+
+        function validatePassword(input) {
+            if (input.value.trim() === '') {
+                showError(input, 'Password is required');
+                return false;
+            } else {
+                showSuccess(input);
+                return true;
+            }
+        }
+
+        // Helper functions
+        function showError(input, message) {
+            const formGroup = input.parentElement;
+            const errorDiv = formGroup.querySelector('.error-message') || document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerText = message;
+            input.classList.add('error');
+            input.classList.remove('success');
+            if (!formGroup.querySelector('.error-message')) {
+                formGroup.appendChild(errorDiv);
+            }
+        }
+
+        function showSuccess(input) {
+            const formGroup = input.parentElement;
+            const errorDiv = formGroup.querySelector('.error-message');
+            if (errorDiv) {
+                formGroup.removeChild(errorDiv);
+            }
+            input.classList.remove('error');
+            input.classList.add('success');
+        }
+
+        function clearErrors() {
+            document.querySelectorAll('.error-message').forEach(error => error.remove());
+            document.querySelectorAll('.error').forEach(field => field.classList.remove('error'));
+        }
+    });
 </script>
 </body>
 </html>

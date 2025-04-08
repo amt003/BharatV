@@ -20,7 +20,7 @@ function sendVerificationEmail($recipientEmail, $verificationCode) {
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'bharatv2k25@gmail.com';
-        $mail->Password   = 'ntty itsx jfbg wvzo';
+        $mail->Password   = 'tzvp bxrs pewb vdcc';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
@@ -67,169 +67,169 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bharatv - OTP Verification</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Roboto', sans-serif;
+            font-family: Arial, sans-serif;
         }
 
         body {
-            background: #f5f5f5;  /* Light gray background */
+            background-color: white;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, white 100%);
+            padding: 15px;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 2rem;
         }
 
-        .login-container {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        .header img {
+            max-height: 100px;
+            max-width: 250px;
+        }
+
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            padding: 20px;
+        }
+
+        .login-wrapper {
             width: 100%;
-            max-width: 400px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            transform-style: preserve-3d;
-            perspective: 1000px;
-            animation: containerFloat 3s ease-in-out infinite;
+            max-width: 500px;
+            background: white;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 30px;
+            animation: fadeIn 0.6s ease-out;
         }
 
-        .logo {
+        h1 {
             text-align: center;
-            margin-bottom: 2rem;
-            font-size: 2.5rem;
-            font-weight: 800;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-            color: #2e7d32;  /* Dark green color */
-        }
-
-        .task { color: #42b72a; }
-        .mate { color: #2b5419; }
-
-        h2 {
-            font-size: 1.8rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 20px;
             color: #333;
         }
 
         p {
-            font-size: 1rem !important;
+            text-align: center;
             color: #666;
+            margin-bottom: 20px;
         }
 
         .otp-inputs {
             display: flex;
             justify-content: center;
-            align-items: center;
-            margin: 2rem auto;
-            gap: 12px;
-            max-width: 360px;
+            gap: 10px;
+            margin-bottom: 20px;
         }
 
         .otp-inputs input {
-            width: 45px;
-            height: 45px;
+            width: 40px;
+            height: 40px;
             text-align: center;
-            font-size: 1.5rem;
-            font-weight: 600;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            background: white;
-            color: #333;
-            transition: all 0.3s ease;
-            padding: 0;
-            margin: 0;
+            font-size: 18px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
         }
 
         .otp-inputs input:focus {
             outline: none;
-            border-color: #42b72a;
-            box-shadow: 0 0 10px rgba(66, 183, 42, 0.1);
+            border-color: green;
         }
 
-        .login-btn {
-            width: 100%;
-            padding: 1rem;
-            background: #42b72a;
+        button {
+            background: green;
             color: white;
+            padding: 12px;
             border: none;
-            border-radius: 12px;
-            font-size: 1.2rem;
-            font-weight: 700;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            margin: 1.5rem 0;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
         }
 
-        .login-btn:hover {
-            background: #36a420;
-            box-shadow: 0 5px 15px rgba(54, 164, 32, 0.2);
+        button:hover {
+            background: rgb(42, 189, 12);
         }
 
         .error-message {
-            background-color: #fff3f3;
-            color: #dc2626;
-            padding: 1rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
             text-align: center;
-            border: 1px solid #fecdd3;
-            font-size: 1rem;
         }
 
         .resend-text {
             text-align: center;
-            margin-top: 1.5rem;
-            color: #666;
-            font-size: 0.9rem;
+            margin-top: 20px;
+            font-size: 14px;
         }
 
         .resend-text a {
-            color: #42b72a;
+            color: green;
             text-decoration: none;
-            font-weight: 600;
+            font-weight: 500;
             transition: color 0.3s ease;
         }
 
         .resend-text a:hover {
-            color: #36a420;
+            color: #1B5E20;
         }
 
-        @keyframes containerFloat {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo">
-            <span class="task">Bharatv</span>
+    <div class="header">
+        <a href="home.php"><img src="assets/logo.jpg" alt="BharatV Logo"></a>
+    </div>
+
+    <div class="page-container">
+        <div class="login-wrapper">
+            <h1>OTP Verification</h1>
+            <p>Enter the 6-digit code sent to your email</p>
+            
+            <?php if (!empty($error_message)): ?>
+                <div class="error-message"><?php echo htmlspecialchars($error_message); ?></div>
+            <?php endif; ?>
+
+            <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+                <div class="otp-inputs">
+                    <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp2')" id="otp1" name="otp1">
+                    <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp3')" id="otp2" name="otp2">
+                    <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp4')" id="otp3" name="otp3">
+                    <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp5')" id="otp4" name="otp4">
+                    <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp6')" id="otp5" name="otp5">
+                    <input type="text" maxlength="1" required id="otp6" name="otp6">
+                </div>
+                <button type="submit" name="verify">Verify OTP</button>
+            </form>
+
+            <div class="resend-text">
+                Didn't receive the code? <a href="forgot_password.php">Resend OTP</a>
+            </div>
         </div>
-        <h2>OTP Verification</h2>
-        <?php if (!empty($error_message)): ?>
-            <div class="error-message">
-                <?php echo htmlspecialchars($error_message); ?>
-            </div>
-        <?php endif; ?>
-        <p style="text-align: center; color:black; margin-bottom: 1.5rem;">Enter the 6-digit code sent to your email.</p>
-        <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
-            <div class="form-group otp-inputs">
-                <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp2')" id="otp1" name="otp1">
-                <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp3')" id="otp2" name="otp2">
-                <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp4')" id="otp3" name="otp3">
-                <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp5')" id="otp4" name="otp4">
-                <input type="text" maxlength="1" required oninput="moveToNext(this, 'otp6')" id="otp5" name="otp5">
-                <input type="text" maxlength="1" required id="otp6" name="otp6">
-            </div>
-            <button type="submit" class="login-btn" name="verify">Verify OTP</button>
-          
-        </form>
     </div>
 
     <script>

@@ -18,14 +18,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "OTP has expired. Please register again.";
     } elseif ($entered_otp === $stored_data['otp']) {
         // Insert user into database
-        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role,aadhaar_number,aadhaar_file,address,phone,ward_id,dob,email_verified,approved_by_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,0)");
-        $stmt->bind_param("ssssssssss",     
+        $stmt = $conn->prepare("INSERT INTO users (name, email, password, role, aadhaar_number, aadhaar_file, voter_id_proof, address, phone, ward_id, dob, email_verified, approved_by_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0)");
+        
+        // Debug output - can be removed in production
+        error_log("Session data: " . print_r($_SESSION['temp_registration'], true));
+        
+        // Fix the voter_id_proof field to use the correct key from session
+        $voter_id_proof = $stored_data['voter_id_file']; // Changed from voter_id_proof to voter_id_file
+        
+        $stmt->bind_param("sssssssssss",     
             $stored_data['name'],
             $stored_data['email'],
             $stored_data['password'],
             $stored_data['role'],
             $stored_data['aadhaar_number'],
             $stored_data['aadhaar_file'],
+            $voter_id_proof, // Use the corrected variable
             $stored_data['address'],
             $stored_data['phone'],
             $stored_data['ward_id'],

@@ -136,17 +136,30 @@ function getElectionStatus($start_date, $end_date) {
     }
 }
 
-// Fetch all elections
+// Initialize the elections array before the query
 $elections = [];
+
+// Fetch all elections
 $sql = "SELECT * FROM elections ORDER BY created_at DESC";
 $result = $conn->query($sql);
+
+// Add debug code
+echo "<!-- Debug: Number of elections: " . ($result ? $result->num_rows : 'Query failed') . " -->";
+
+if (!$result) {
+    echo "<!-- Debug: SQL Error: " . $conn->error . " -->";
+}
+
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
         $row['ward_names'] = getWardNames($row['ward_ids'], $wards);
-        // Calculate and set the status
         $row['status'] = getElectionStatus($row['start_date'], $row['end_date']);
         $elections[] = $row;
+        // Add debug for each election
+        echo "<!-- Debug: Found election: " . htmlspecialchars($row['Election_title']) . " -->";
     }
+} else {
+    echo "<!-- Debug: No elections found -->";
 }
 
 // Display messages
@@ -215,19 +228,6 @@ if (isset($_SESSION['error'])) {
             margin-bottom: 20px;
             font-size: 1.5em;
         }
-
-        /* Add these animation keyframes at the top of your CSS */
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         /* Form Styles */
         .add-election-section {
             background: #ffffff;
@@ -317,9 +317,6 @@ if (isset($_SESSION['error'])) {
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            animation: fadeIn 0.6s ease-out 0.2s; /* 0.2s delay for staggered effect */
-            opacity: 0;
-            animation-fill-mode: forwards;
         }
 
         table {
@@ -594,7 +591,10 @@ if (isset($_SESSION['error'])) {
 
         <!-- Elections List -->
         <div class="elections-list">
-            <h3> Elections List</h3>
+            <h3>Elections List</h3>
+            <?php if (empty($elections)): ?>
+                <p style="text-align: center; padding: 20px;">No elections found. Create your first election above.</p>
+            <?php else: ?>
             <table>
                 <thead>
                     <tr>
@@ -617,25 +617,26 @@ if (isset($_SESSION['error'])) {
                             <td><?php echo $election['end_date']; ?></td>
                             <td><?php echo $election['status']; ?></td>
                             <td>
-    <div class="action-buttons">
-        <button class="btn btn-primary" 
-                onclick='showEditModal(<?php echo json_encode($election); ?>)'
-                <?php echo ($election['status'] === 'Completed') ? 'disabled style="background-color: #cccccc; cursor: not-allowed;"' : ''; ?>>
-            <i class="fas fa-edit"></i> Edit    
-        </button>
-        <form method="POST" style="margin: 0;">
-            <input type="hidden" name="election_id" value="<?php echo $election['election_id']; ?>">
-            <button type="submit" name="delete_election" class="btn btn-danger" 
-                    onclick="return confirm('Are you sure you want to delete this election?')">
-                <i class="fas fa-trash"></i> Delete
-            </button>
-        </form>
-    </div>
-</td>
+                                <div class="action-buttons">
+                                    <button class="btn btn-primary" 
+                                            onclick='showEditModal(<?php echo json_encode($election); ?>)'
+                                            <?php echo ($election['status'] === 'Completed') ? 'disabled style="background-color: #cccccc; cursor: not-allowed;"' : ''; ?>>
+                                        <i class="fas fa-edit"></i> Edit    
+                                    </button>
+                                    <form method="POST" style="margin: 0;">
+                                        <input type="hidden" name="election_id" value="<?php echo $election['election_id']; ?>">
+                                        <button type="submit" name="delete_election" class="btn btn-danger" 
+                                                onclick="return confirm('Are you sure you want to delete this election?')">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <?php endif; ?>
         </div>
     </div>
 

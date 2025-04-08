@@ -63,8 +63,7 @@ try {
         
        // Get total registered voters in the ward
        $votersQuery = "SELECT COUNT(*) as total FROM users 
-       WHERE ward_id = ? 
-       AND status = '1' 
+       WHERE ward_id = ?  
        AND approved_by_admin = '1'";
 $votersStmt = $conn->prepare($votersQuery);
 $votersStmt->bind_param("i", $row['ward_id']);

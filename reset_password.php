@@ -38,126 +38,121 @@ if ($conn->connect_error) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soccer-11 - Reset Password</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <title>Bharatv - Reset Password</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Roboto', sans-serif;
+            font-family: Arial, sans-serif;
         }
 
         body {
-            background: #ffffff;  /* Changed to white */
+            background-color: white;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, white 100%);
+            padding: 15px;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 2rem;
         }
 
-        .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 3rem;
-            border-radius: 15px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        .header img {
+            max-height: 100px;
+            max-width: 250px;
+        }
+
+        .page-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            padding: 20px;
+        }
+
+        .login-wrapper {
             width: 100%;
-            max-width: 450px;
-            backdrop-filter: blur(10px);
+            max-width: 500px;
+            background: white;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 30px;
             animation: fadeIn 0.6s ease-out;
         }
 
-        .logo {
+        h1 {
             text-align: center;
-            margin-bottom: 2.5rem;
-            font-size: 2.5rem;
-            font-weight: 700;
-        }
-
-        .task { color: #2ecc71; }
-        .mate { color: #27ae60; }
-
-        h2 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 2.5rem;
-            font-size: 1.8rem;
-            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
         }
 
         .form-group {
-            margin-bottom: 2rem;
-            position: relative;
+            margin-bottom: 20px;
         }
 
-        .form-group label {
+        label {
             display: block;
-            margin-bottom: 0.8rem;
-            color: #34495e;
-            font-size: 1rem;
-            font-weight: 500;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
         }
 
-        .form-group input {
+        input {
             width: 100%;
-            padding: 1rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.9);
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
         }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: #2ecc71;
-            box-shadow: 0 0 10px rgba(46, 204, 113, 0.2);
+        input.error {
+            border-color: #dc3545;
         }
 
-        .login-btn {
-            width: 100%;
-            padding: 1.2rem;
-            background: linear-gradient(to right, #2ecc71, #27ae60);
+        button {
+            background: green;
             color: white;
+            padding: 12px;
             border: none;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
         }
 
-        .login-btn:hover {
-            background: linear-gradient(to right, #27ae60, #219a52);
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 8px 15px rgba(46, 204, 113, 0.2);
+        button:hover {
+            background: rgb(42, 189, 12);
         }
 
         .error-message {
-            color: #e74c3c;
-            font-size: 0.9rem;
-            margin-top: 0.7rem;
-            font-weight: 500;
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+            text-align: center;
         }
 
         .error-message1 {
-            background-color: rgba(231, 76, 60, 0.1);
-            color: #e74c3c;
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
             text-align: center;
-            border: 1px solid rgba(231, 76, 60, 0.3);
+            border: 1px solid rgba(220, 53, 69, 0.2);
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(30px);
+                transform: translateY(-20px);
             }
             to {
                 opacity: 1;
@@ -167,30 +162,34 @@ if ($conn->connect_error) {
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="logo">
-            <span class="task">Bharatv</span>
-        </div>
-        <h2>Reset Password</h2>
-        <?php if (!empty($error_message)): ?>
-            <div class="error-message1">
-                <?php echo htmlspecialchars($error_message); ?>
-            </div>
-        <?php endif; ?>
+    <div class="header">
+        <a href="home.php"><img src="assets/logo.jpg" alt="BharatV Logo"></a>
+    </div>
 
-        <form id="resetForm" method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
-            <div class="form-group">
-                <label for="new_password">New Password</label>
-                <input type="password" id="new_password" name="new_password" required minlength="6">
-                <div id="password-error" class="error-message"></div> <!-- Error message for password -->
-            </div>
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
-                <div id="cpassword-error" class="error-message"></div> <!-- Error message for confirm password -->
-            </div>
-            <button type="submit" class="login-btn">Reset Password</button>
-        </form>
+    <div class="page-container">
+        <div class="login-wrapper">
+            <h1>Reset Password</h1>
+            
+            <?php if (!empty($error_message)): ?>
+                <div class="error-message1">
+                    <?php echo htmlspecialchars($error_message); ?>
+                </div>
+            <?php endif; ?>
+
+            <form id="resetForm" method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" required minlength="6">
+                    <div id="password-error" class="error-message"></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
+                    <div id="cpassword-error" class="error-message"></div>
+                </div>
+                <button type="submit">Reset Password</button>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -224,7 +223,6 @@ if ($conn->connect_error) {
                 const password = passwordInput.value.trim();
                 const confirmPassword = cpasswordInput.value.trim();
                 
-                // Confirm password should only be checked if both fields are filled
                 if (confirmPassword === '') {
                     cpasswordError.innerHTML = "Please confirm your password";
                     cpasswordInput.style.border = "2px solid red";
@@ -241,12 +239,13 @@ if ($conn->connect_error) {
             }
 
             passwordInput.addEventListener('input', function() {
-            checkPassword();
-            if (cpasswordInput.value !== '') {
-                checkConfirmPassword();
-            }
-        });
-        cpasswordInput.addEventListener('input', checkConfirmPassword);
+                checkPassword();
+                if (cpasswordInput.value !== '') {
+                    checkConfirmPassword();
+                }
+            });
+            
+            cpasswordInput.addEventListener('input', checkConfirmPassword);
 
             document.getElementById('resetForm').addEventListener('submit', function(e) {
                 e.preventDefault();
@@ -256,10 +255,7 @@ if ($conn->connect_error) {
                 if (!checkConfirmPassword()) isValid = false;
                 
                 if (isValid) {
-                    console.log('Form is valid, submitting...');
-                    this.submit();  
-                } else {
-                    console.log('Form has errors, not submitting.');
+                    this.submit();
                 }
             });
         });

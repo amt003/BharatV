@@ -5,7 +5,7 @@ if (!isset($_SESSION)) {
 }
 
 // Check if user is logged in and has appropriate role
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['voter', 'candidate'])) {
+if (!isset($_SESSION['user_id'])) {
     echo "<p class='error'>Please log in to access this feature.</p>";
     exit();
 }
@@ -19,7 +19,7 @@ $election_id = intval($_GET['election_id']);
 $user_id = $_SESSION['user_id'];
 
 // Fetch election details with prepared statement
-$query = "SELECT *, 
+$query = "SELECT *,election_title,
           CASE 
               WHEN CURDATE() BETWEEN start_date AND end_date THEN 'ongoing'
               WHEN CURDATE() > end_date THEN 'completed'
@@ -44,6 +44,7 @@ if ($election['dynamic_status'] !== 'ongoing') {
 }
 
 // Check if user has already voted
+$alreadyVoted = false;
 $query = "SELECT * FROM votes WHERE id = ? AND 
           contesting_id IN (SELECT contesting_id FROM contesting_candidates WHERE Election_id = ?)";
 $stmt = $conn->prepare($query);
@@ -52,33 +53,36 @@ $stmt->execute();
 $existing_vote = $stmt->get_result()->fetch_assoc();
 
 if ($existing_vote) {
-    echo "<p class='error'>You have already voted in this election.</p>";
-    exit();
+    $alreadyVoted = true;
 }
 
-// Fetch candidates
-$query = "SELECT cc.contesting_id, 
-                 cc.application_type,
-                 cc.independent_party_name, 
-                 cc.independent_party_symbol,
-                 cc.party_id, 
-                 u.name, 
-                 u.phone, 
-                 u.email,
-                 p.party_name, 
-                 p.party_symbol 
-          FROM contesting_candidates cc 
-          JOIN users u ON cc.id = u.id 
-          LEFT JOIN parties p ON cc.party_id = p.party_id 
-          WHERE cc.Election_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $election_id);
-$stmt->execute();
-$candidates = $stmt->get_result();
+// Only fetch candidates if the user hasn't voted yet
+$candidates = null;
+if (!$alreadyVoted) {
+    // Fetch candidates
+    $query = "SELECT cc.contesting_id, 
+                     cc.application_type,
+                     cc.independent_party_name, 
+                     cc.independent_party_symbol,
+                     cc.party_id, 
+                     u.name, 
+                     u.phone, 
+                     u.email,
+                     p.party_name, 
+                     p.party_symbol 
+              FROM contesting_candidates cc 
+              JOIN users u ON cc.id = u.id 
+              LEFT JOIN parties p ON cc.party_id = p.party_id 
+              WHERE cc.Election_id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $election_id);
+    $stmt->execute();
+    $candidates = $stmt->get_result();
 
-if ($candidates->num_rows === 0) {
-    echo "<p class='error'>No approved candidates found for this election.</p>";
-    exit();
+    if ($candidates->num_rows === 0) {
+        echo "<p class='error'>No approved candidates found for this election.</p>";
+        exit();
+    }
 }
 ?>
 
@@ -406,9 +410,9 @@ if ($candidates->num_rows === 0) {
     }
 
     .back-button {
-        position: absolute;
-        top: 20px;
-        left: 20px;
+        position: relative;
+        display: inline-block;
+        margin-bottom: 20px;
         background: linear-gradient(135deg, var(--primary-orange), var(--dark-orange));
         color: white;
         padding: 10px 20px;
@@ -417,7 +421,7 @@ if ($candidates->num_rows === 0) {
         cursor: pointer;
         font-weight: 500;
         font-size: 0.9em;
-        display: flex;
+    
         align-items: center;
         gap: 8px;
         transition: all 0.3s ease;
@@ -442,80 +446,214 @@ if ($candidates->num_rows === 0) {
     .back-button i {
         font-size: 1.2em;
     }
+    
+    .navigation {
+        margin-bottom: 20px;
+        text-align: left;
+    }
+    
+    /* Already voted message styling */
+    .already-voted-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+        text-align: center;
+        padding: 40px;
+    }
+    
+    .already-voted-message {
+        background: linear-gradient(to right, #fff, #f8f9fa);
+        border-radius: 15px;
+        padding: 30px 40px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        border: 1px solid #e0e0e0;
+        border-left: 5px solid var(--primary-orange);
+        max-width: 600px;
+        margin: 0 auto;
+        position: relative;
+        overflow: hidden;
+        animation: fadeInUp 0.6s ease-out;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .already-voted-icon {
+        font-size: 60px;
+        color: var(--primary-orange);
+        margin-bottom: 20px;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    
+    .already-voted-title {
+        color: var(--dark-orange);
+        font-size: 26px;
+        font-weight: bold;
+        margin-bottom: 15px;
+    }
+    
+    .already-voted-text {
+        color: #555;
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 25px;
+    }
+    
+    .return-button {
+        background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+        color: white;
+        padding: 12px 25px;
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1em;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 10px;
+        box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .return-button:hover {
+        background: linear-gradient(135deg, var(--dark-green), var(--primary-green));
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(46, 125, 50, 0.3);
+        color: white;
+    }
+    
+    .already-voted-details {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 10px;
+        padding: 15px;
+        margin-top: 20px;
+        font-size: 14px;
+        color: #777;
+        border: 1px dashed #ddd;
+    }
+    
+    .already-voted-details p {
+        margin: 5px 0;
+    }
 </style>
 
 <div class="voting-section">
-    <a  href="<?php echo $_SESSION['role'].'.php'; ?>" class="back-button">
-        <i class="fas fa-arrow-left"></i> Back to Dashboard
-    </a>
+    
 
-    <div class="ballot-paper">
-        <div class="ballot-header">
-            <h2>Official Ballot</h2>
-            <p class="election-description"><?= htmlspecialchars($election['Description']); ?></p>
+    <?php if ($alreadyVoted): ?>
+        <!-- Already voted message -->
+        <div class="already-voted-container">
+            <div class="already-voted-message">
+                <div class="already-voted-icon">
+                    <i class="fas fa-vote-yea"></i>
+                </div>
+                <h2 class="already-voted-title">You've Already Cast Your Vote</h2>
+                <p class="already-voted-text">
+                    Thank you for participating in the democratic process! Your vote for this election has been recorded successfully and cannot be changed.
+                </p>
+                <div class="already-voted-details">
+                    <p><i class="fas fa-calendar-check"></i> Election: <strong><?= htmlspecialchars($election['election_title']); ?></strong></p>
+                    <p><i class="fas fa-clock"></i> Vote Cast: <strong><?= date('F j, Y, g:i a', strtotime($existing_vote['casted_at'])); ?></strong></p>
+                </div>
+                <a href="<?php echo $_SESSION['role'].'.php'; ?>" class="return-button">
+                    <i class="fas fa-home"></i> Return to Dashboard
+                </a>
+            </div>
         </div>
+    <?php else: ?>
+        <!-- Display ballot if user hasn't voted -->
+        <div class="ballot-paper">
+            <div class="ballot-header">
+                <h2>Official Ballot</h2>
+                <p class="election-description"><?= htmlspecialchars($election['Description']); ?></p>
+            </div>
 
-        <div class="ballot-instructions">
-            <h4><i class="fas fa-info-circle"></i> Voting Instructions:</h4>
-            <ul>
-                <li>Select only ONE candidate by clicking their box</li>
-                <li>Review your selection carefully before submitting</li>
-                <li>Your vote is confidential and secure</li>
-                <li>This action cannot be undone once submitted</li>
-            </ul>
-        </div>
+            <div class="ballot-instructions">
+                <h4><i class="fas fa-info-circle"></i> Voting Instructions:</h4>
+                <ul>
+                    <li>Select only ONE candidate by clicking their box</li>
+                    <li>Review your selection carefully before submitting</li>
+                    <li>Your vote is confidential and secure</li>
+                    <li>This action cannot be undone once submitted</li>
+                </ul>
+            </div>
 
-        <form id="voteForm" method="POST">
-            <input type="hidden" name="election_id" value="<?= $election_id; ?>">
-            
-            <?php while ($candidate = $candidates->fetch_assoc()): ?>
-                <div class="candidate-option">
-                    <input type="radio" 
-                           name="contesting_id" 
-                           value="<?= $candidate['contesting_id']; ?>" 
-                           id="candidate_<?= $candidate['contesting_id']; ?>" 
-                           required>
-                    <div class="candidate-info">
-                        <div class="candidate-name">
-                            <i class="fas fa-user-circle"></i>
-                            <?= htmlspecialchars($candidate['name']); ?>
-                        </div>
-                        <div class="party-info">
-                            <span class="party-name">
-                                <i class="fas fa-flag"></i>
-                                <?php 
-                                echo htmlspecialchars($candidate['independent_party_name'] ?? $candidate['party_name']); 
-                                ?>
-                            </span>
-                            <!-- <?php 
-                            // Handle both independent and regular party symbols
-                            if ($candidate['application_type'] === 'independent') {
-                                if ($candidate['independent_party_symbol']) {
-                                    echo '<img src="data:image/jpeg;base64,' . base64_encode($candidate['independent_party_symbol']) . '" 
-                                          alt="Party Symbol" class="party-symbol">';
+            <form id="voteForm" method="POST">
+                <input type="hidden" name="election_id" value="<?= $election_id; ?>">
+                
+                <?php while ($candidate = $candidates->fetch_assoc()): ?>
+                    <div class="candidate-option">
+                        <input type="radio" 
+                               name="contesting_id" 
+                               value="<?= $candidate['contesting_id']; ?>" 
+                               id="candidate_<?= $candidate['contesting_id']; ?>" 
+                               required>
+                        <div class="candidate-info">
+                            <div class="candidate-name">
+                                <i class="fas fa-user-circle"></i>
+                                <?= htmlspecialchars($candidate['name']); ?>
+                            </div>
+                            <div class="party-info">
+                                <span class="party-name">
+                                    <i class="fas fa-flag"></i>
+                                    <?php 
+                                    echo htmlspecialchars($candidate['independent_party_name'] ?? $candidate['party_name']); 
+                                    ?>
+                                </span>
+                                <!-- <?php 
+                                // Handle both independent and regular party symbols
+                                if ($candidate['application_type'] === 'independent') {
+                                    if ($candidate['independent_party_symbol']) {
+                                        echo '<img src="data:image/jpeg;base64,' . base64_encode($candidate['independent_party_symbol']) . '" 
+                                              alt="Party Symbol" class="party-symbol">';
+                                    }
+                                } else {
+                                    if ($candidate['party_symbol']) {
+                                        echo '<img src="data:image/jpeg;base64,' . base64_encode($candidate['party_symbol']) . '" 
+                                              alt="Party Symbol" class="party-symbol">';
+                                    }
                                 }
-                            } else {
-                                if ($candidate['party_symbol']) {
-                                    echo '<img src="data:image/jpeg;base64,' . base64_encode($candidate['party_symbol']) . '" 
-                                          alt="Party Symbol" class="party-symbol">';
-                                }
-                            }
-                            ?> -->
+                                ?> -->
+                            </div>
                         </div>
                     </div>
-                </div>
-            <?php endwhile; ?>
+                <?php endwhile; ?>
 
-            <button type="submit" class="submit-vote">
-                <i class="fas fa-check-circle"></i> Submit Vote
-            </button>
-        </form>
+                <button type="submit" class="submit-vote">
+                    <i class="fas fa-check-circle"></i> Submit Vote
+                </button>
+            </form>
 
-        <div class="ballot-footer">
-            <p><i class="fas fa-shield-alt"></i> Your vote is secure and confidential</p>
-            <p><i class="fas fa-clock"></i> Election closes: <?= date('F j, Y, g:i a', strtotime($election['end_date'])); ?></p>
+            <div class="ballot-footer">
+                <p><i class="fas fa-shield-alt"></i> Your vote is secure and confidential</p>
+                <p><i class="fas fa-clock"></i> Election closes: <?= date('F j, Y, g:i a', strtotime($election['end_date'])); ?></p>
+            </div>
         </div>
-    </div>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -530,7 +668,140 @@ if (typeof loadContent !== 'function') {
             })
             .catch(error => {
                 console.error('Error loading content:', error);
+                showNotification('Error loading content', 'error');
             });
+    }
+}
+
+// Create a notification function for displaying styled messages
+function showNotification(message, type = 'info', title = '', icon = '', duration = 5000) {
+    // If notification container doesn't exist, create it
+    let container = document.getElementById('notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-container';
+        container.style.position = 'fixed';
+        container.style.top = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '9999';
+        container.style.maxWidth = '400px';
+        document.body.appendChild(container);
+    }
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    // Determine color based on type
+    let bgColor, borderColor, textColor;
+    if (type === 'success') {
+        bgColor = '#d4edda';
+        borderColor = '#c3e6cb';
+        textColor = '#155724';
+        icon = icon || 'fas fa-check-circle';
+    } else if (type === 'error') {
+        bgColor = '#f8d7da';
+        borderColor = '#f5c6cb';
+        textColor = '#721c24';
+        icon = icon || 'fas fa-times-circle';
+    } else {
+        bgColor = '#e0f2f1';
+        borderColor = '#b2dfdb';
+        textColor = '#2E7D32';
+        icon = icon || 'fas fa-info-circle';
+    }
+    
+    // Set styles
+    notification.style.padding = '15px 20px';
+    notification.style.marginBottom = '15px';
+    notification.style.backgroundColor = bgColor;
+    notification.style.borderLeft = `5px solid ${borderColor}`;
+    notification.style.borderRadius = '5px';
+    notification.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+    notification.style.color = textColor;
+    notification.style.position = 'relative';
+    notification.style.animation = 'slideInRight 0.5s forwards';
+    notification.style.opacity = '0';
+    
+    // Add title if provided
+    if (title) {
+        const titleElement = document.createElement('div');
+        titleElement.style.fontWeight = 'bold';
+        titleElement.style.marginBottom = '5px';
+        titleElement.style.fontSize = '1.1em';
+        if (icon) {
+            titleElement.innerHTML = `<i class="${icon}" style="margin-right: 8px;"></i>${title}`;
+        } else {
+            titleElement.textContent = title;
+        }
+        notification.appendChild(titleElement);
+    }
+    
+    // Add message
+    const messageElement = document.createElement('div');
+    messageElement.textContent = message;
+    notification.appendChild(messageElement);
+    
+    // Add close button
+    const closeButton = document.createElement('span');
+    closeButton.innerHTML = '&times;';
+    closeButton.style.position = 'absolute';
+    closeButton.style.top = '10px';
+    closeButton.style.right = '10px';
+    closeButton.style.cursor = 'pointer';
+    closeButton.style.fontSize = '1.2em';
+    closeButton.onclick = function() {
+        container.removeChild(notification);
+    };
+    notification.appendChild(closeButton);
+    
+    // Add animation keyframes
+    if (!document.getElementById('notification-style')) {
+        const style = document.createElement('style');
+        style.id = 'notification-style';
+        style.innerHTML = `
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            @keyframes fadeOut {
+                from {
+                    opacity: 1;
+                }
+                to {
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Add to container and auto-remove after duration
+    container.appendChild(notification);
+    
+    // Make it visible with animation
+    setTimeout(() => {
+        notification.style.opacity = '1';
+    }, 10);
+    
+    // Set auto-remove timeout
+    if (duration) {
+        setTimeout(() => {
+            if (notification.parentNode === container) {
+                notification.style.animation = 'fadeOut 0.5s forwards';
+                setTimeout(() => {
+                    if (notification.parentNode === container) {
+                        container.removeChild(notification);
+                    }
+                }, 500);
+            }
+        }, duration);
     }
 }
 
@@ -548,23 +819,53 @@ document.getElementById('voteForm').addEventListener('submit', function(e) {
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error('Network response was not ok: ' + response.status);
         }
-        return response.json();
+        // First, get the raw text to debug any potential issues
+        return response.text().then(text => {
+            console.log("Raw response:", text); // For debugging
+            try {
+                // Try to parse the response as JSON
+                return JSON.parse(text);
+            } catch (e) {
+                console.error("JSON parsing error:", e);
+                // If there was a parsing error, log it and throw a better error
+                throw new Error('Invalid JSON response: ' + e.message);
+            }
+        });
     })
     .then(data => {
+        // Use the enhanced notification with titles and icons
         if (data.success) {
-            alert(data.message);
+            showNotification(
+                data.message, 
+                data.type || 'success', 
+                data.title || 'Vote Confirmed', 
+                data.icon || 'fas fa-check-circle'
+            );
+            
+            // Redirect after successful vote
             setTimeout(() => {
-                loadContent('<?php echo $_SESSION['role']; ?>_dashboard');
-            }, 1000);
+                window.location.href = '<?php echo $_SESSION['role']; ?>.php';
+            }, 3000);
         } else {
-            alert(data.message || 'Error submitting vote');
+            showNotification(
+                data.message || 'Error submitting vote', 
+                data.type || 'error', 
+                data.title || 'Error', 
+                data.icon || 'fas fa-times-circle'
+            );
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error submitting vote. Please try again.');
+        // This will provide more details about the error
+        showNotification(
+            'Error: ' + error.message, 
+            'error', 
+            'Connection Error', 
+            'fas fa-wifi'
+        );
     });
 });
 </script>

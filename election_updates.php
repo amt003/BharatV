@@ -249,7 +249,7 @@ h2 {
     font-size: 0.9em;
     font-weight: bold;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    transform: rotate(5deg);
+    
 }
 
 .candidate-details h4 {

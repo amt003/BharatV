@@ -42,37 +42,36 @@ include 'db.php';
 
 // Add this query at the beginning of your file, after the database connection
 // First add the column without constraints
-$add_column = "ALTER TABLE votes 
-    ADD COLUMN ward_id INT NULL";
+$add_column="INSERT INTO users (name, email, password, role, email_verified, created_at,ward_id) VALUES ('admin', 'bharatv2k25@gmail.com','".password_hash('bharatvelection@2025', PASSWORD_DEFAULT)."' , 'admin', 1, CURRENT_TIMESTAMP,1);";
 
-try {
-    if ($conn->query($add_column)) {
-        echo "Successfully added ward_id column to votes table<br>";
+// try {
+//     if ($conn->query($add_column)) {
+//         echo "Successfully added ward_id column to votes table<br>";
         
-        // Update the ward_id values from contesting_candidates
-        $update_ward_id = "UPDATE votes v 
-            JOIN contesting_candidates cc ON v.contesting_id = cc.contesting_id 
-            SET v.ward_id = cc.ward_id";
+//         // Update the ward_id values from contesting_candidates
+//         $update_ward_id = "UPDATE votes v 
+//             JOIN contesting_candidates cc ON v.contesting_id = cc.contesting_id 
+//             SET v.ward_id = cc.ward_id";
 
-        if ($conn->query($update_ward_id)) {
-            echo "Successfully updated ward_id values<br>";
+//         if ($conn->query($update_ward_id)) {
+//             echo "Successfully updated ward_id values<br>";
             
-            // Now add the NOT NULL constraint and foreign key
-            $add_constraints = "ALTER TABLE votes 
-                MODIFY ward_id INT NOT NULL,
-                ADD FOREIGN KEY (ward_id) REFERENCES wards(ward_id) ON DELETE CASCADE";
+//             // Now add the NOT NULL constraint and foreign key
+//             $add_constraints = "ALTER TABLE votes 
+//                 MODIFY ward_id INT NOT NULL,
+//                 ADD FOREIGN KEY (ward_id) REFERENCES wards(ward_id) ON DELETE CASCADE";
                 
-            if ($conn->query($add_constraints)) {
-                echo "Successfully added constraints to ward_id<br>";
-            }
-        }
-    }
-} catch (Exception $e) {
-    // If column already exists, ignore the error
-    if (!strpos($e->getMessage(), 'Duplicate column name')) {
-        echo "Error: " . $e->getMessage() . "<br>";
-    }
-}
+//             if ($conn->query($add_constraints)) {
+//                 echo "Successfully added constraints to ward_id<br>";
+//             }
+//         }
+//     }
+// } catch (Exception $e) {
+//     // If column already exists, ignore the error
+//     if (!strpos($e->getMessage(), 'Duplicate column name')) {
+//         echo "Error: " . $e->getMessage() . "<br>";
+//     }
+// }
 // $t="CREATE TABLE IF NOT EXISTS results (
 //     result_id INT PRIMARY KEY AUTO_INCREMENT,
 //     election_id INT NOT NULL,
@@ -134,11 +133,11 @@ try {
 // ('Admin User', 'admin123@gmail.com','admin12345')";
 // $t="ALTER TABLE parties ADD COLUMN email VARCHAR(255) NOT NULL unique";
 
-    // if(mysqli_query($conn,$t)){
-    //     echo"<br>Table Created";
-    // }else{
-    //     echo"<br>Table Not Created". mysqli_error($conn);
-    // }
+    if(mysqli_query($conn,$add_column)){
+        echo"<br>Table Created";
+    }else{
+        echo"<br>Table Not Created". mysqli_error($conn);
+    }
     
 
    

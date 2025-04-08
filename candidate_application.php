@@ -48,6 +48,20 @@ if ($contestingResult->num_rows > 0) {
     $contestingDetails = $contestingResult->fetch_assoc();
 }
 
+// Check for rejected applications
+$checkRejectedQuery = $conn->prepare("
+    SELECT election_title 
+    FROM candidate_applications ca
+    JOIN elections e ON ca.election_id = e.election_id
+    WHERE ca.id = ? 
+    AND e.status != 'completed'
+    AND (ca.application_ro_approval = 'rejected' OR ca.application_party_approval = 'rejected')
+");
+$checkRejectedQuery->bind_param("i", $user_id);
+$checkRejectedQuery->execute();
+$rejectedResult = $checkRejectedQuery->get_result();
+$hasRejectedApplication = $rejectedResult->num_rows > 0;
+
 // Check for pending applications - MODIFIED QUERY
 $checkPendingQuery = $conn->prepare("
     SELECT election_title 
@@ -55,19 +69,26 @@ $checkPendingQuery = $conn->prepare("
     JOIN elections e ON ca.election_id = e.election_id
     WHERE ca.id = ? 
     AND (ca.application_ro_approval = 'pending' OR ca.application_party_approval = 'pending')
+    AND ca.application_ro_approval != 'rejected' 
+    AND ca.application_party_approval != 'rejected'
 ");
 $checkPendingQuery->bind_param("i", $user_id);
 $checkPendingQuery->execute();
 $pendingResult = $checkPendingQuery->get_result();
 $hasPendingApplication = $pendingResult->num_rows > 0;
 
-if ($hasPendingApplication) {
+if ($hasRejectedApplication) {
+    $rejectedDetails = $rejectedResult->fetch_assoc();
+    $message = "Your application for the election: " . 
+               htmlspecialchars($rejectedDetails['election_title']) . 
+               " has been rejected. You cannot submit new applications until this election is completed.";
+    $messageType = "error";
+} elseif ($hasPendingApplication) {
     $pendingDetails = $pendingResult->fetch_assoc();
     $message = "You have a pending application for the election: " . 
                htmlspecialchars($pendingDetails['election_title']) . 
                ". Please wait for it to be processed.";
     $messageType = "error";
-   
 } elseif ($isContesting) {
     $message = "You are currently contesting as a " . 
                ($contestingDetails['application_type'] === 'independent' ? 'an independent' : 'a party-affiliated') . 
@@ -80,8 +101,9 @@ if ($hasPendingApplication) {
 $current_date = date('Y-m-d');
 $cutoff_date = date('Y-m-d', strtotime('+15 days'));
 
-// Only fetch available elections if no pending applications and not contesting
-if (!$hasPendingApplication && !$isContesting) {
+$electionsResult = null;
+// Only fetch available elections if no pending applications, no rejected applications, and not contesting
+if (!$hasPendingApplication && !$hasRejectedApplication && !$isContesting) {
     $electionsQuery = $conn->prepare("
         SELECT election_id, election_title 
         FROM elections 
@@ -421,25 +443,20 @@ button[type="submit"]:hover {
 
 <div class="application-container">
     <h2>Candidate Application Form</h2>
+    
     <?php if ($message): ?>
-        <div class="<?php echo $messageType; ?>">
-            <?php echo $message; ?>
-        </div>
-    <?php endif; ?>
+    <div class="<?php echo $messageType; ?>">
+        <?php echo $message; ?>
+    </div>
+<?php endif; ?>
 
-    <?php if ($isContesting): ?>
-        <div class="error">
-            <?php echo $message; ?>
-        </div>
-    <?php elseif ($hasPendingApplication): ?>
-        <div class="error">
-            <?php echo $message; ?>
-        </div>
-    <?php elseif (!$electionsResult || $electionsResult->num_rows === 0): ?>
-        <div class="error">
-            No available elections found for your ward at this time.
-        </div>
-    <?php else: ?>
+<?php if ($isContesting || $hasPendingApplication): ?>
+    <!-- No need to display the message again here, it's already shown above -->
+<?php elseif (!$electionsResult || $electionsResult->num_rows === 0): ?>
+    <div class="error">
+        No available elections found for your ward at this time.
+    </div>
+<?php else: ?>
 
     <form method="post" action="<?php echo $_SERVER['PHP_SELF']; ?>" enctype="multipart/form-data">
         <div class="form-group">

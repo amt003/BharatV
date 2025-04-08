@@ -21,14 +21,14 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 // Redirect to appropriate dashboard if already approved
-if ($user['approved_by_admin']) {
+if ($user['approved_by_admin'] === 1) {
     $dashboard = ($user['role'] === 'candidate') ? 'candidate.php' : 'voter.php';
     header("Location: " . $dashboard);
     exit();
 }
 
 // Function to get status details
-function getStatusDetails($status, $role, $created_at) {
+function getStatusDetails($status, $role, $created_at, $rejection_reason = '') {
     if ($status === 1) {
         return [
             'badge_color' => '#28a745',
@@ -36,23 +36,29 @@ function getStatusDetails($status, $role, $created_at) {
             'message' => "Your registration has been approved. You can now access the " . 
                         ucfirst($role) . " dashboard."
         ];
-    } else if ($status === -1) {
-        return [
-            'badge_color' => '#dc3545',
-            'status_text' => 'Rejected',
-            'message' => "Your registration has been rejected. Please contact support for more information."
-        ];
-    } else {
+    } else if ($status === 0) {
         $waiting_time = ceil((time() - strtotime($created_at)) / (60 * 60 * 24));
         return [
             'badge_color' => '#ffd700',
             'status_text' => 'Pending Approval',
             'message' => "Your registration is under review (Day $waiting_time). Average processing time is 2-3 business days."
         ];
+    } else {
+        return [
+            'badge_color' => '#dc3545',
+            'status_text' => 'Rejected',
+            'message' => "Your registration has been rejected." . 
+                      (!empty($rejection_reason) ? " Reason: " . $rejection_reason : "")
+        ];
     }
 }
 
-$status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $user['created_at']);
+$status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $user['created_at'], $user['rejection_reason']);
+
+// Define timeline classes based on status
+$registrationClass = 'completed';
+$documentClass = $user['approved_by_admin'] === 0 ? 'current' : ($user['approved_by_admin'] === 1 ? 'completed' : '');
+$approvalClass = $user['approved_by_admin'] === 1 ? 'completed' : ($user['approved_by_admin'] === -1 ? 'rejected' : '');
 ?>
 
 <!DOCTYPE html>
@@ -165,6 +171,10 @@ $status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $u
             background-color: #007bff;
         }
 
+        .timeline-item.rejected:before {
+            background-color: #dc3545;
+        }
+
         .timeline-item:after {
             content: '';
             position: absolute;
@@ -199,10 +209,20 @@ $status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $u
             text-align: center;
             margin-top: 20px;
             padding: 15px;
-            background-color: orange;
+            background-color: <?php echo $user['approved_by_admin'] === -1 ? '#dc3545' : 'orange'; ?>;
             border: 1px solid #ffeeba;
             border-radius: 4px;
             color: white;
+        }
+
+        .rejection-reason {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            color: #721c24;
+            display: <?php echo ($user['approved_by_admin'] === -1 && !empty($user['rejection_reason'])) ? 'block' : 'none'; ?>;
         }
 
         .logout-btn {
@@ -263,7 +283,7 @@ $status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $u
             </div>
 
             <div class="status-timeline">
-                <div class="timeline-item completed">
+                <div class="timeline-item <?php echo $registrationClass; ?>">
                     <div class="timeline-content">
                         <strong>Registration Submitted</strong>
                         <div class="timeline-date">
@@ -272,20 +292,30 @@ $status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $u
                     </div>
                 </div>
 
-                <div class="timeline-item current">
+                <div class="timeline-item <?php echo $documentClass; ?>">
                     <div class="timeline-content">
                         <strong>Document Verification</strong>
                         <div class="document-status">
                             <p>✓ Aadhaar Card Uploaded</p>
-                            <p>✓ Information Verification in Progress</p>
+                            <p><?php echo $user['approved_by_admin'] === -1 ? '✘ Verification Failed' : '✓ Information Verification in Progress'; ?></p>
                         </div>
                     </div>
                 </div>
 
-                <div class="timeline-item">
+                <div class="timeline-item <?php echo $approvalClass; ?>">
                     <div class="timeline-content">
-                        <strong>Final Approval</strong>
-                        <div class="timeline-date">Pending</div>
+                        <strong><?php echo $user['approved_by_admin'] === -1 ? 'Application Rejected' : 'Final Approval'; ?></strong>
+                        <div class="timeline-date">
+                            <?php 
+                            if ($user['approved_by_admin'] === 1) {
+                                echo date('F j, Y', strtotime($user['updated_at']));
+                            } elseif ($user['approved_by_admin'] === -1) {
+                                echo date('F j, Y', strtotime($user['updated_at']));
+                            } else {
+                                echo 'Pending';
+                            }
+                            ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -293,6 +323,14 @@ $status_details = getStatusDetails($user['approved_by_admin'], $user['role'], $u
             <div class="status-message">
                 <?php echo $status_details['message']; ?>
             </div>
+
+            <?php if ($user['approved_by_admin'] === -1 && !empty($user['rejection_reason'])): ?>
+            <div class="rejection-reason">
+                <strong>Rejection Details:</strong>
+                <p><?php echo htmlspecialchars($user['rejection_reason']); ?></p>
+                <p>If you believe this is an error or you would like to provide additional information, please contact our support team.</p>
+            </div>
+            <?php endif; ?>
         </div>
 
         <a href="<?php echo $_SERVER['PHP_SELF']; ?>" class="refresh-btn">Refresh Status</a>

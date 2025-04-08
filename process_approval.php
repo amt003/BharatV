@@ -17,6 +17,7 @@ try {
 
     $user_id = (int)$_POST['user_id'];
     $action = $_POST['action'];
+    $rejection_reason = isset($_POST['rejection_reason']) ? trim($_POST['rejection_reason']) : '';
     
     // Validate user_id
     if ($user_id <= 0) {
@@ -28,18 +29,36 @@ try {
         throw new Exception("Invalid action");
     }
     
+    // If rejecting, require a reason
+    if ($action === 'reject' && empty($rejection_reason)) {
+        $rejection_reason = "Your application did not meet our verification requirements.";
+    }
+    
     // Set the approval status
-    $status = ($action === 'approve') ? 1 : 0;
+    $status = ($action === 'approve') ? 1 : -1;
+    
+    // Get user details for verification
+    $userQuery = "SELECT name, email, role FROM users WHERE id = ?";
+    $userStmt = $conn->prepare($userQuery);
+    $userStmt->bind_param("i", $user_id);
+    $userStmt->execute();
+    $userResult = $userStmt->get_result();
+    
+    if ($userResult->num_rows === 0) {
+        throw new Exception("User not found");
+    }
+    
+    $user = $userResult->fetch_assoc();
     
     // Update the user's approval status
-    $sql = "UPDATE users SET approved_by_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+    $sql = "UPDATE users SET approved_by_admin = ?, rejection_reason = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
     $stmt = $conn->prepare($sql);
     
     if (!$stmt) {
         throw new Exception("Database error: " . $conn->error);
     }
     
-    $stmt->bind_param("ii", $status, $user_id);
+    $stmt->bind_param("isi", $status, $rejection_reason, $user_id);
     
     if (!$stmt->execute()) {
         throw new Exception("Failed to update user status");

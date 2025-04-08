@@ -53,7 +53,7 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
                 padding: 20px 0;
                 display: flex;
                 flex-direction: column;
-                height: 100vh;
+                height: 103vh;
                 position: fixed;
             }
 
@@ -399,6 +399,8 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
                 border-radius: 10px;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                 position: relative;
+                max-height: 120vh;
+                overflow-y: auto;
             }
 
             .close-modal {
@@ -473,10 +475,6 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
                 margin: 10px 0;
             }
 
-            .percentage {
-                color: var(--primary-orange);
-                font-weight: 500;
-            }
 
             .vote-distribution {
                 margin: 30px 0;
@@ -543,6 +541,14 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
                 background: var(--dark-green);
                 transform: translateY(-2px);
             }
+            /*fetch candidates style*/
+            .error-candidates-fetch{
+                color:red;
+                font-size: 18px;
+                font-weight: bold;
+                text-align: center;
+                margin-top:250px;
+            }
         </style>
     </head>
     <body>
@@ -560,6 +566,7 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
                     <button onclick="loadContent('candidate_application')">Candidate Application</button>
                     <button onclick="loadContent('Application_status')">Application Status</button>
                     <button onclick="loadContent('election_reports')">My Election Reports</button>
+                    <button onclick="loadContent('settings')">Settings</button>
                 </div>
                 <div class="sidebar-logout">
                     <button onclick="logout()">Logout</button>
@@ -665,6 +672,18 @@ function loadContent(section) {
                 });
             break;
         
+        case 'settings':
+            fetch('settings.php')
+                .then(response => response.text())
+                .then(data => {
+                    contentDiv.innerHTML = data;
+                    setTimeout(initializePasswordValidation, 100);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    contentDiv.innerHTML = 'Error loading settings';
+                });
+            break;
         default:
             console.error('Invalid section:', section);
             contentDiv.innerHTML = 'Invalid section';
@@ -1048,7 +1067,7 @@ function initializeFormValidation() {
 
  <script>
     //script for showing tabs in candidate_profile.php
-            function showTab(event, tabId) {
+    function showTab(event, tabId) {
     // Hide all tabs
     document.querySelectorAll('.history-tab').forEach(tab => {
         tab.style.display = 'none';
@@ -1063,6 +1082,76 @@ function initializeFormValidation() {
     });
     event.target.classList.add('active');
 }
+  
+//update profile ajax form submission
+
+document.addEventListener('click', function(event) {
+    // Your existing event delegation code
+    if (event.target && event.target.id === 'toggleEdit') {
+        document.getElementById('viewMode').style.display = 'none';
+        document.getElementById('editMode').style.display = 'block';
+    }
+    
+    if (event.target && event.target.id === 'cancelEdit') {
+        document.getElementById('viewMode').style.display = 'block';
+        document.getElementById('editMode').style.display = 'none';
+    }
+    
+    // Add handler for the save button
+    if (event.target && event.target.id === 'saveChanges') {
+        // Get the form data
+        const form = document.getElementById('profileUpdateForm');
+        const formData = new FormData(form);
+        formData.append('update_profile', '1'); // Add the form submission indicator
+        
+        // Send AJAX request
+        fetch('update_profile.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-success';
+                messageDiv.textContent = data.message;
+                
+                // Insert message at the top of the form
+                const sectionBody = document.querySelector('.section-body');
+                sectionBody.insertBefore(messageDiv, sectionBody.firstChild);
+                
+                // Reload the profile data
+                fetch('candidate_profile.php')
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newProfileData = doc.querySelector('#viewMode').innerHTML;
+                        document.querySelector('#viewMode').innerHTML = newProfileData;
+                    })
+                    .catch(error => console.error('Error reloading profile:', error));
+                
+                // Switch back to view mode
+                document.getElementById('viewMode').style.display = 'block';
+                document.getElementById('editMode').style.display = 'none';
+                
+                // Remove message after 3 seconds
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            } else {
+                // Show error message
+                alert(data.message || 'Error updating profile');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating profile. Please try again.');
+        });
+    }
+});
+</script>
 </script>
         <div id="candidateModal" class="modal">
             <div class="modal-content">
@@ -1193,6 +1282,7 @@ window.onclick = function(event) {
 </script>
 
 <script>
+    //sidebar toggle
 document.addEventListener('DOMContentLoaded', function() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.querySelector('.sidebar');
@@ -1255,13 +1345,13 @@ function displayElectionReport(reportData) {
                 <div class="metric-card">
                     <h4>Position Secured</h4>
                     <p class="large-number">${reportData.position}</p>
-                    <p>out of ${reportData.total_candidates} candidates</p>
+                    <p class="percentage">out of ${reportData.total_candidates} candidates</p>
                 </div>
                 
                 <div class="metric-card">
                     <h4>Voter Turnout</h4>
-                    <p class="percentage">${reportData.voter_turnout}%</p>
-                    <p>${reportData.total_votes} out of ${reportData.total_registered_voters} registered voters</p>
+                    <p class="large-number">${reportData.voter_turnout}%</p>
+                    <p class="percentage">${reportData.total_votes} out of ${reportData.total_registered_voters} registered voters</p>
                 </div>
             </div>
             
@@ -1306,6 +1396,617 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function initializeProfileEdit() {
+        const toggleEditButton = document.getElementById('toggleEdit');
+        const viewMode = document.getElementById('viewMode');
+        const editMode = document.getElementById('editMode');
+        const saveChangesButton = document.getElementById('saveChanges');
+        const cancelEditButton = document.getElementById('cancelEdit');
+
+        if (toggleEditButton) {
+            toggleEditButton.addEventListener('click', function() {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            });
+        }
+
+        if (cancelEditButton) {
+            cancelEditButton.addEventListener('click', function() {
+                viewMode.style.display = 'block';
+                editMode.style.display = 'none';
+            });
+        }
+
+        if (saveChangesButton) {
+    saveChangesButton.addEventListener('click', function() {
+        const form = document.getElementById('profileUpdateForm');
+        const formData = new FormData(form);
+        formData.append('update_profile', '1');
+
+        // Files will be automatically included in FormData
+
+        fetch('update_profile.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-success';
+                messageDiv.textContent = data.message;
+                
+                // Insert message at the top of the form
+                const sectionBody = document.querySelector('.section-body');
+                sectionBody.insertBefore(messageDiv, sectionBody.firstChild);
+                
+                // Reload the profile content
+                loadProfileContent();
+                
+                // Switch back to view mode
+                document.getElementById('viewMode').style.display = 'block';
+                document.getElementById('editMode').style.display = 'none';
+                
+                // Remove message after 3 seconds
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            } else {
+                // Show error message
+                alert(data.message || 'Error updating profile');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating profile. Please try again.');
+        });
+    });
+}
+    }
+
+    // Function to reload profile content
+    function loadProfileContent() {
+        fetch('candidate_profile.php')
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Update the profile content
+                const dynamicContent = document.getElementById('dynamicContent');
+                if (dynamicContent) {
+                    dynamicContent.innerHTML = doc.body.innerHTML;
+                    initializeProfileEdit(); // Re-initialize event listeners
+                }
+            })
+            .catch(error => console.error('Error reloading profile:', error));
+    }
+
+    // Initialize the profile edit functionality
+    initializeProfileEdit();
+});
+</script>
+
+<script>
+// Update the toggleIndependentFields function to include preview elements
+function toggleIndependentFields() {
+    const partySelect = document.getElementById('party_id');
+    const independentFields = document.getElementById('independent-fields');
+    
+    // Create preview elements if they don't exist
+    if (!document.getElementById('party_symbol_preview')) {
+        const previewDiv = document.createElement('div');
+        previewDiv.id = 'party_symbol_preview';
+        previewDiv.style.display = 'none';
+        previewDiv.style.marginTop = '10px';
+        previewDiv.innerHTML = `
+            <img id="symbol_preview_image" src="#" alt="Party Symbol Preview" 
+                 style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
+        `;
+        
+        const symbolInput = document.getElementById('independent_party_symbol');
+        if (symbolInput) {
+            symbolInput.parentNode.appendChild(previewDiv);
+        }
+    }
+
+    const independentInputs = independentFields?.querySelectorAll('input');
+    
+    if (partySelect.value === 'independent') {
+        independentFields?.classList.add('visible');
+        independentInputs?.forEach(input => input.required = true);
+        initializeIndependentValidation(); // Initialize validation when independent is selected
+    } else {
+        independentFields?.classList.remove('visible');
+        independentInputs?.forEach(input => input.required = false);
+        // Clear the fields when switching away from independent
+        independentInputs?.forEach(input => {
+            if (input.type === 'file') {
+                input.value = '';
+                const preview = document.getElementById('party_symbol_preview');
+                if (preview) {
+                    preview.style.display = 'none';
+                }
+            } else {
+                input.value = '';
+            }
+            // Remove error messages when switching
+            removeErrorMessage(input);
+        });
+    }
+
+    // Add preview functionality for party symbol
+    const symbolInput = document.getElementById('independent_party_symbol');
+    if (symbolInput) {
+        symbolInput.onchange = function() {
+            const preview = document.getElementById('party_symbol_preview');
+            const previewImg = document.getElementById('symbol_preview_image');
+            
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(this.files[0]);
+                validatePartySymbol(this); // Validate when file is selected
+            } else {
+                preview.style.display = 'none';
+            }
+        };
+    }
+}
+
+// Function to create error message element
+function createErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'validation-error';
+    errorDiv.style.color = '#dc3545';
+    errorDiv.style.fontSize = '0.875rem';
+    errorDiv.style.marginTop = '5px';
+    errorDiv.textContent = message;
+    return errorDiv;
+}
+
+// Function to remove error message
+function removeErrorMessage(input) {
+    const existingError = input.parentElement.querySelector('.validation-error');
+    if (existingError) {
+        existingError.remove();
+    }
+    input.style.borderColor = '#ced4da'; // Reset border color
+}
+
+// Function to show error message
+function showErrorMessage(input, message) {
+    removeErrorMessage(input);
+    const errorDiv = createErrorMessage(message);
+    input.parentElement.appendChild(errorDiv);
+    input.style.borderColor = '#dc3545';
+}
+
+// Initialize validation for independent party fields
+function initializeIndependentValidation() {
+    const partyNameInput = document.getElementById('independent_party_name');
+    const partySymbolInput = document.getElementById('independent_party_symbol');
+
+    if (partyNameInput) {
+        // Validate party name on input
+        partyNameInput.addEventListener('input', function() {
+            validatePartyName(this);
+        });
+
+        // Validate party name on blur
+        partyNameInput.addEventListener('blur', function() {
+            validatePartyName(this);
+        });
+    }
+
+    if (partySymbolInput) {
+        // Validate party symbol on change
+        partySymbolInput.addEventListener('change', function() {
+            validatePartySymbol(this);
+        });
+    }
+}
+
+// Validate party name
+function validatePartyName(input) {
+    const value = input.value.trim();
+    
+    if (value === '') {
+        showErrorMessage(input, 'Party name is required');
+        return false;
+    } else if (value.length < 3) {
+        showErrorMessage(input, 'Party name must be at least 3 characters long');
+        return false;
+    } else if (!/^[A-Za-z\s]+$/.test(value)) {
+        showErrorMessage(input, 'Party name can only contain letters and spaces');
+        return false;
+    } else {
+        removeErrorMessage(input);
+        input.style.borderColor = '#28a745'; // Success state
+        return true;
+    }
+}
+
+// Validate party symbol
+function validatePartySymbol(input) {
+    if (!input.files || input.files.length === 0) {
+        showErrorMessage(input, 'Party symbol is required');
+        return false;
+    }
+
+    const file = input.files[0];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedTypes.includes(file.type)) {
+        showErrorMessage(input, 'Only JPG, PNG, and GIF files are allowed');
+        return false;
+    } else if (file.size > maxSize) {
+        showErrorMessage(input, 'File size must be less than 5MB');
+        return false;
+    } else {
+        removeErrorMessage(input);
+        input.style.borderColor = '#28a745'; // Success state
+        return true;
+    }
+}
+
+// Add form submission validation
+document.addEventListener('submit', function(e) {
+    if (e.target.querySelector('#party_id')?.value === 'independent') {
+        const partyNameValid = validatePartyName(document.getElementById('independent_party_name'));
+        const partySymbolValid = validatePartySymbol(document.getElementById('independent_party_symbol'));
+
+        if (!partyNameValid || !partySymbolValid) {
+            e.preventDefault();
+            // Scroll to first error
+            const firstError = document.querySelector('.validation-error');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }
+});
+</script>
+
+<script>
+// Password validation functionality
+function initializePasswordValidation() {
+    const passwordForm = document.getElementById('passwordForm');
+    if (!passwordForm) return;
+
+    const currentPassword = document.getElementById('current_password');
+    const newPassword = document.getElementById('new_password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const submitButton = document.getElementById('submit_password');
+    const passwordStrength = document.getElementById('password_strength');
+
+    // Create password strength bar
+    if (passwordStrength) {
+        passwordStrength.innerHTML = '<div class="password-strength-bar"></div>';
+    }
+
+    function updatePasswordStrength(password) {
+        if (!passwordStrength) return;
+        
+        let strength = 0;
+        if (password.length >= 8) strength++;
+        if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+        if (password.match(/[0-9]/)) strength++;
+        if (password.match(/[^a-zA-Z0-9]/)) strength++;
+
+        passwordStrength.className = 'password-strength';
+        const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+        
+        if (strength <= 1) {
+            passwordStrength.classList.add('weak');
+            strengthBar.style.width = '33.33%';
+        } else if (strength <= 2) {
+            passwordStrength.classList.add('medium');
+            strengthBar.style.width = '66.66%';
+        } else {
+            passwordStrength.classList.add('strong');
+            strengthBar.style.width = '100%';
+        }
+    }
+
+    function showValidationMessage(element, message, isError = false) {
+        const messageElement = document.getElementById(element.id + '_message');
+        if (messageElement) {
+            messageElement.textContent = message;
+            messageElement.className = 'validation-message ' + (isError ? 'error' : 'success');
+        }
+        element.className = element.className.replace(' error', '').replace(' success', '') + 
+                          (isError ? ' error' : ' success');
+    }
+
+    function clearValidationMessages() {
+        // Clear all validation messages
+        const inputs = [currentPassword, newPassword, confirmPassword];
+        inputs.forEach(input => {
+            if (input) {
+                input.value = ''; // Clear the input values
+                const messageElement = document.getElementById(input.id + '_message');
+                if (messageElement) {
+                    messageElement.textContent = '';
+                    messageElement.className = 'validation-message';
+                }
+                input.className = input.className.replace(' error', '').replace(' success', '');
+            }
+        });
+
+        // Reset password strength bar
+        if (passwordStrength) {
+            passwordStrength.className = 'password-strength';
+            const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+            if (strengthBar) {
+                strengthBar.style.width = '0';
+            }
+        }
+
+        // Disable submit button
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+    }
+
+    function validateForm(field = null) {
+        let isValid = true;
+        const currentValue = currentPassword.value;
+        const newValue = newPassword.value;
+        const confirmValue = confirmPassword.value;
+
+        // Skip validation if all fields are empty (initial state or reset form)
+        if (!currentValue && !newValue && !confirmValue) {
+            // Just disable the button but don't show validation messages
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            return false;
+        }
+
+        // If a specific field is provided, only validate that field
+        if (field) {
+            if (field === currentPassword) {
+                // Validate current password
+                if (currentValue.length < 6) {
+                    showValidationMessage(currentPassword, 'Current password must be at least 6 characters', true);
+                    isValid = false;
+                } else {
+                    showValidationMessage(currentPassword, 'Current password looks good');
+                }
+            } else if (field === newPassword) {
+                // Validate new password
+                if (newValue.length < 6) {
+                    showValidationMessage(newPassword, 'New password must be at least 6 characters', true);
+                    isValid = false;
+                } else {
+                    showValidationMessage(newPassword, 'New password looks good');
+                    updatePasswordStrength(newValue);
+                }
+                
+                // Also check confirm password match if it has a value
+                if (confirmValue) {
+                    if (newValue !== confirmValue) {
+                        showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                        isValid = false;
+                    } else {
+                        showValidationMessage(confirmPassword, 'Passwords match');
+                    }
+                }
+            } else if (field === confirmPassword) {
+                // Validate confirm password
+                if (newValue !== confirmValue) {
+                    showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                    isValid = false;
+                } else if (confirmValue.length >= 6) {
+                    showValidationMessage(confirmPassword, 'Passwords match');
+                }
+            }
+        } else {
+            // Validate all fields (for form submission)
+            
+            // Validate current password
+            if (currentValue.length < 6) {
+                showValidationMessage(currentPassword, 'Current password must be at least 6 characters', true);
+                isValid = false;
+            } else {
+                showValidationMessage(currentPassword, 'Current password looks good');
+            }
+
+            // Validate new password
+            if (newValue.length < 6) {
+                showValidationMessage(newPassword, 'New password must be at least 6 characters', true);
+                isValid = false;
+            } else {
+                showValidationMessage(newPassword, 'New password looks good');
+                updatePasswordStrength(newValue);
+            }
+
+            // Validate confirm password
+            if (newValue !== confirmValue) {
+                showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                isValid = false;
+            } else if (confirmValue.length >= 6) {
+                showValidationMessage(confirmPassword, 'Passwords match');
+            }
+        }
+
+        // Disable submit button if form is invalid
+        if (submitButton) {
+            submitButton.disabled = !isValid;
+        }
+
+        return isValid;
+    }
+
+    // Add event listeners for real-time validation - only validate the changed field
+    if (currentPassword) {
+        currentPassword.addEventListener('input', () => validateForm(currentPassword));
+        // Clear validation on focus
+        currentPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('current_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            currentPassword.className = currentPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        currentPassword.addEventListener('blur', () => {
+            if (currentPassword.value) validateForm(currentPassword);
+        });
+    }
+    
+    if (newPassword) {
+        newPassword.addEventListener('input', () => validateForm(newPassword));
+        // Clear validation on focus
+        newPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('new_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            newPassword.className = newPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        newPassword.addEventListener('blur', () => {
+            if (newPassword.value) validateForm(newPassword);
+        });
+    }
+    
+    if (confirmPassword) {
+        confirmPassword.addEventListener('input', () => validateForm(confirmPassword));
+        // Clear validation on focus
+        confirmPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('confirm_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            confirmPassword.className = confirmPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        confirmPassword.addEventListener('blur', () => {
+            if (confirmPassword.value) validateForm(confirmPassword);
+        });
+    }
+
+    // Form submission handler
+    passwordForm.addEventListener('submit', function(e) {
+        // Validate all fields for submission
+        if (!validateForm()) {
+            e.preventDefault();
+            return false;
+        }
+        
+        e.preventDefault();
+        console.log("Form is valid, submitting via AJAX");
+        
+        const formData = new FormData(this);
+        formData.append('change_password', '1'); // Make sure this is added
+        
+        // First verify the current password
+        const verifyData = new FormData();
+        verifyData.append('verify_password', '1');
+        verifyData.append('current_password', formData.get('current_password'));
+        
+        fetch('settings.php', {
+            method: 'POST',
+            body: verifyData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log("Current password verified, submitting new password");
+                // If current password is correct, submit the form
+                fetch('settings.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(html => {
+                    console.log("Password update response received");
+                    
+                    // Reset form fields manually
+                    currentPassword.value = '';
+                    newPassword.value = '';
+                    confirmPassword.value = '';
+                    
+                    // Clear all validation messages
+                    const messageElements = document.querySelectorAll('.validation-message');
+                    messageElements.forEach(el => {
+                        el.textContent = '';
+                        el.className = 'validation-message';
+                    });
+                    
+                    // Reset password strength indicator
+                    if (passwordStrength) {
+                        passwordStrength.className = 'password-strength';
+                        const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+                        if (strengthBar) {
+                            strengthBar.style.width = '0';
+                        }
+                    }
+                    
+                    // Remove success/error classes from inputs
+                    document.querySelectorAll('input').forEach(input => {
+                        input.className = input.className.replace(' error', '').replace(' success', '');
+                    });
+                    
+                    // Reload the settings page to show success/error message
+                    document.getElementById('dynamicContent').innerHTML = html;
+                    
+                    // Reinitialize password validation with clean state
+                    setTimeout(() => {
+                        initializePasswordValidation();
+                        // Extra check to ensure validation messages are hidden
+                        const newMessageElements = document.querySelectorAll('.validation-message');
+                        newMessageElements.forEach(el => {
+                            el.textContent = '';
+                            el.className = 'validation-message';
+                        });
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Error updating password:', error);
+                    alert('Error updating password: ' + error.message);
+                });
+            } else {
+                console.log("Current password verification failed");
+                // Show error message for incorrect current password
+                const messageElement = document.getElementById('current_password_message');
+                if (messageElement) {
+                    messageElement.textContent = data.message || 'Current password is incorrect';
+                    messageElement.className = 'validation-message error';
+                }
+                document.getElementById('current_password').classList.add('error');
+            }
+        })
+        .catch(error => {
+            console.error('Error verifying password:', error);
+            alert('Error verifying password: ' + error.message);
+        });
+    });
+    
+    // Add form reset handler
+    passwordForm.addEventListener('reset', function() {
+        clearValidationMessages();
+    });
+    
+    // Clear validation messages on initial load
+    clearValidationMessages();
+    
+    console.log("Password validation initialized");
+}
 </script>
 
 </body>

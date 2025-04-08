@@ -319,8 +319,8 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
             <div class="nav-menu">
                 <button onclick="loadContent('voter_profile')">Profile</button>
                 <button onclick="loadContent('election_updates')">Election Update</button>
-
-                <button onclick="loadContent('results')">View results</button>
+                <button onclick="loadContent('results')">View Results</button>
+                <button onclick="loadContent('settings')">Settings</button>
                 
             </div>
             <div class="sidebar-logout">
@@ -345,13 +345,410 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
             </div>
         </div>
     </div>
+<script>
+    document.addEventListener('click', function(event) {
+    // Your existing event delegation code
+    if (event.target && event.target.id === 'toggleEdit') {
+        document.getElementById('viewMode').style.display = 'none';
+        document.getElementById('editMode').style.display = 'block';
+    }
+    
+    if (event.target && event.target.id === 'cancelEdit') {
+        document.getElementById('viewMode').style.display = 'block';
+        document.getElementById('editMode').style.display = 'none';
+    }
+    
+    // Add handler for the save button
+    if (event.target && event.target.id === 'saveChanges') {
+        // Get the form data
+        const form = document.getElementById('profileUpdateForm');
+        const formData = new FormData(form);
+        formData.append('update_profile', '1'); // Add the form submission indicator
+        
+        // Send AJAX request
+        fetch('update_profile.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'alert alert-success';
+                messageDiv.textContent = data.message;
+                
+                // Insert message at the top of the form
+                const sectionBody = document.querySelector('.section-body');
+                sectionBody.insertBefore(messageDiv, sectionBody.firstChild);
+                
+                // Reload the profile data
+                fetch('voter_profile.php')
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newProfileData = doc.querySelector('#viewMode').innerHTML;
+                        document.querySelector('#viewMode').innerHTML = newProfileData;
+                    })
+                    .catch(error => console.error('Error reloading profile:', error));
+                
+                // Switch back to view mode
+                document.getElementById('viewMode').style.display = 'block';
+                document.getElementById('editMode').style.display = 'none';
+                
+                // Remove message after 3 seconds
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            } else {
+                // Show error message
+                alert(data.message || 'Error updating profile');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating profile. Please try again.');
+        });
+    }
+});
+</script>
 
-    <script>
-         function loadContent(page, electionId = null) {
+<script>
+    //password change 
+// Password validation functionality
+function initializePasswordValidation() {
+    const passwordForm = document.getElementById('passwordForm');
+    if (!passwordForm) return;
+
+    const currentPassword = document.getElementById('current_password');
+    const newPassword = document.getElementById('new_password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const submitButton = document.getElementById('submit_password');
+    const passwordStrength = document.getElementById('password_strength');
+
+    // Create password strength bar
+    if (passwordStrength) {
+        passwordStrength.innerHTML = '<div class="password-strength-bar"></div>';
+    }
+
+    function updatePasswordStrength(password) {
+        if (!passwordStrength) return;
+        
+        let strength = 0;
+        if (password.length >= 8) strength++;
+        if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+        if (password.match(/[0-9]/)) strength++;
+        if (password.match(/[^a-zA-Z0-9]/)) strength++;
+
+        passwordStrength.className = 'password-strength';
+        const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+        
+        if (strength <= 1) {
+            passwordStrength.classList.add('weak');
+            strengthBar.style.width = '33.33%';
+        } else if (strength <= 2) {
+            passwordStrength.classList.add('medium');
+            strengthBar.style.width = '66.66%';
+        } else {
+            passwordStrength.classList.add('strong');
+            strengthBar.style.width = '100%';
+        }
+    }
+
+    function showValidationMessage(element, message, isError = false) {
+        const messageElement = document.getElementById(element.id + '_message');
+        if (messageElement) {
+            messageElement.textContent = message;
+            messageElement.className = 'validation-message ' + (isError ? 'error' : 'success');
+        }
+        element.className = element.className.replace(' error', '').replace(' success', '') + 
+                          (isError ? ' error' : ' success');
+    }
+
+    function clearValidationMessages() {
+        // Clear all validation messages
+        const inputs = [currentPassword, newPassword, confirmPassword];
+        inputs.forEach(input => {
+            if (input) {
+                input.value = ''; // Clear the input values
+                const messageElement = document.getElementById(input.id + '_message');
+                if (messageElement) {
+                    messageElement.textContent = '';
+                    messageElement.className = 'validation-message';
+                }
+                input.className = input.className.replace(' error', '').replace(' success', '');
+            }
+        });
+
+        // Reset password strength bar
+        if (passwordStrength) {
+            passwordStrength.className = 'password-strength';
+            const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+            if (strengthBar) {
+                strengthBar.style.width = '0';
+            }
+        }
+
+        // Disable submit button
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+    }
+
+    function validateForm(field = null) {
+        let isValid = true;
+        const currentValue = currentPassword.value;
+        const newValue = newPassword.value;
+        const confirmValue = confirmPassword.value;
+
+        // Skip validation if all fields are empty (initial state or reset form)
+        if (!currentValue && !newValue && !confirmValue) {
+            // Just disable the button but don't show validation messages
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+            return false;
+        }
+
+        // If a specific field is provided, only validate that field
+        if (field) {
+            if (field === currentPassword) {
+                // Validate current password
+                if (currentValue.length < 6) {
+                    showValidationMessage(currentPassword, 'Current password must be at least 6 characters', true);
+                    isValid = false;
+                } else {
+                    showValidationMessage(currentPassword, 'Current password looks good');
+                }
+            } else if (field === newPassword) {
+                // Validate new password
+                if (newValue.length < 6) {
+                    showValidationMessage(newPassword, 'New password must be at least 6 characters', true);
+                    isValid = false;
+                } else {
+                    showValidationMessage(newPassword, 'New password looks good');
+                    updatePasswordStrength(newValue);
+                }
+                
+                // Also check confirm password match if it has a value
+                if (confirmValue) {
+                    if (newValue !== confirmValue) {
+                        showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                        isValid = false;
+                    } else {
+                        showValidationMessage(confirmPassword, 'Passwords match');
+                    }
+                }
+            } else if (field === confirmPassword) {
+                // Validate confirm password
+                if (newValue !== confirmValue) {
+                    showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                    isValid = false;
+                } else if (confirmValue.length >= 6) {
+                    showValidationMessage(confirmPassword, 'Passwords match');
+                }
+            }
+        } else {
+            // Validate all fields (for form submission)
+            
+            // Validate current password
+            if (currentValue.length < 6) {
+                showValidationMessage(currentPassword, 'Current password must be at least 6 characters', true);
+                isValid = false;
+            } else {
+                showValidationMessage(currentPassword, 'Current password looks good');
+            }
+
+            // Validate new password
+            if (newValue.length < 6) {
+                showValidationMessage(newPassword, 'New password must be at least 6 characters', true);
+                isValid = false;
+            } else {
+                showValidationMessage(newPassword, 'New password looks good');
+                updatePasswordStrength(newValue);
+            }
+
+            // Validate confirm password
+            if (newValue !== confirmValue) {
+                showValidationMessage(confirmPassword, 'Passwords do not match', true);
+                isValid = false;
+            } else if (confirmValue.length >= 6) {
+                showValidationMessage(confirmPassword, 'Passwords match');
+            }
+        }
+
+        // Disable submit button if form is invalid
+        if (submitButton) {
+            submitButton.disabled = !isValid;
+        }
+
+        return isValid;
+    }
+
+    // Add event listeners for real-time validation - only validate the changed field
+    if (currentPassword) {
+        currentPassword.addEventListener('input', () => validateForm(currentPassword));
+        // Clear validation on focus
+        currentPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('current_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            currentPassword.className = currentPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        currentPassword.addEventListener('blur', () => {
+            if (currentPassword.value) validateForm(currentPassword);
+        });
+    }
+    
+    if (newPassword) {
+        newPassword.addEventListener('input', () => validateForm(newPassword));
+        // Clear validation on focus
+        newPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('new_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            newPassword.className = newPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        newPassword.addEventListener('blur', () => {
+            if (newPassword.value) validateForm(newPassword);
+        });
+    }
+    
+    if (confirmPassword) {
+        confirmPassword.addEventListener('input', () => validateForm(confirmPassword));
+        // Clear validation on focus
+        confirmPassword.addEventListener('focus', () => {
+            const messageElement = document.getElementById('confirm_password_message');
+            if (messageElement) {
+                messageElement.textContent = '';
+                messageElement.className = 'validation-message';
+            }
+            confirmPassword.className = confirmPassword.className.replace(' error', '').replace(' success', '');
+        });
+        // Validate on blur
+        confirmPassword.addEventListener('blur', () => {
+            if (confirmPassword.value) validateForm(confirmPassword);
+        });
+    }
+
+    // Form submission handler
+    passwordForm.addEventListener('submit', function(e) {
+        // Validate all fields for submission
+        if (!validateForm()) {
+            e.preventDefault();
+            return false;
+        }
+        
+        e.preventDefault();
+        console.log("Form is valid, submitting via AJAX");
+        
+        const formData = new FormData(this);
+        formData.append('change_password', '1'); // Make sure this is added
+        
+        // First verify the current password
+        const verifyData = new FormData();
+        verifyData.append('verify_password', '1');
+        verifyData.append('current_password', formData.get('current_password'));
+        
+        fetch('settings.php', {
+            method: 'POST',
+            body: verifyData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log("Current password verified, submitting new password");
+                // If current password is correct, submit the form
+                fetch('settings.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(html => {
+                    console.log("Password update response received");
+                    
+                    // Reset form fields manually
+                    currentPassword.value = '';
+                    newPassword.value = '';
+                    confirmPassword.value = '';
+                    
+                    // Clear all validation messages
+                    const messageElements = document.querySelectorAll('.validation-message');
+                    messageElements.forEach(el => {
+                        el.textContent = '';
+                        el.className = 'validation-message';
+                    });
+                    
+                    // Reset password strength indicator
+                    if (passwordStrength) {
+                        passwordStrength.className = 'password-strength';
+                        const strengthBar = passwordStrength.querySelector('.password-strength-bar');
+                        if (strengthBar) {
+                            strengthBar.style.width = '0';
+                        }
+                    }
+                    
+                    // Remove success/error classes from inputs
+                    document.querySelectorAll('input').forEach(input => {
+                        input.className = input.className.replace(' error', '').replace(' success', '');
+                    });
+                    
+                    // Reload the settings page to show success/error message
+                    document.getElementById('dynamicContent').innerHTML = html;
+                    
+                    // Reinitialize password validation with clean state
+                    setTimeout(() => {
+                        initializePasswordValidation();
+                        // Extra check to ensure validation messages are hidden
+                        const newMessageElements = document.querySelectorAll('.validation-message');
+                        newMessageElements.forEach(el => {
+                            el.textContent = '';
+                            el.className = 'validation-message';
+                        });
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Error updating password:', error);
+                    alert('Error updating password: ' + error.message);
+                });
+            } else {
+                console.log("Current password verification failed");
+                // Show error message for incorrect current password
+                const messageElement = document.getElementById('current_password_message');
+                if (messageElement) {
+                    messageElement.textContent = data.message || 'Current password is incorrect';
+                    messageElement.className = 'validation-message error';
+                }
+                document.getElementById('current_password').classList.add('error');
+            }
+        })
+        .catch(error => {
+            console.error('Error verifying password:', error);
+            alert('Error verifying password: ' + error.message);
+        });
+    });
+    
+    // Add form reset handler
+    passwordForm.addEventListener('reset', function() {
+        clearValidationMessages();
+    });
+    
+    // Clear validation messages on initial load
+    clearValidationMessages();
+    
+    console.log("Password validation initialized");
+}
+
+function loadContent(page, electionId = null) {
     let url = `${page}.php`;
     
-    // If it's the fetch_candidates page and no electionId is provided, 
-    // show a message asking to select an election first
     if (page === 'fetch_candidates' && !electionId) {
         document.getElementById('dynamicContent').innerHTML = `
             <h2>View Candidates</h2>
@@ -359,7 +756,6 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
         return;
     }
 
-    // Append election ID if provided
     if (electionId) {
         url += `?election_id=${electionId}`;
     }
@@ -371,7 +767,9 @@ $userProfilePhoto = $user['profile_photo'] ?? null; // Get the profile photo or 
        
             if (page === 'vote') {
                 initializeVoteForm();
-            }  
+            } else if (page === 'settings') {
+                setTimeout(initializePasswordValidation, 100);
+            }
         })
         .catch(error => {
             console.error('Error loading content:', error);
@@ -578,6 +976,102 @@ document.addEventListener('DOMContentLoaded', function() {
         sidebar.classList.toggle('collapsed');
         mainContent.classList.toggle('expanded');
     });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Function to handle profile updates
+    function handleProfileUpdate() {
+        const saveChangesButton = document.getElementById('saveChanges');
+        if (saveChangesButton) {
+            saveChangesButton.addEventListener('click', function() {
+                const form = document.getElementById('profileUpdateForm');
+                if (!form) return;
+
+                const formData = new FormData(form);
+                formData.append('update_profile', '1');
+
+                // Check if a file was selected
+                const fileInput = document.getElementById('profile_photo');
+                if (fileInput && fileInput.files.length > 0) {
+                    formData.append('profile_photo', fileInput.files[0]);
+                }
+
+                fetch('update_profile.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show success message
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'alert alert-success';
+                        messageDiv.textContent = data.message;
+                        
+                        // Insert message at the top of the form
+                        const sectionBody = document.querySelector('.section-body');
+                        if (sectionBody) {
+                            sectionBody.insertBefore(messageDiv, sectionBody.firstChild);
+                        }
+                        
+                        // Reload the profile data
+                        loadProfileContent();
+                        
+                        // Update the header profile image if a profile photo was returned
+                        if (data.profile_photo) {
+                            const headerProfileImage = document.querySelector('.profile-image');
+                            if (headerProfileImage) {
+                                headerProfileImage.src = 'uploads/' + data.profile_photo;
+                            }
+                        }
+                        
+                        // Switch back to view mode
+                        const viewMode = document.getElementById('viewMode');
+                        const editMode = document.getElementById('editMode');
+                        if (viewMode && editMode) {
+                            viewMode.style.display = 'block';
+                            editMode.style.display = 'none';
+                        }
+                        
+                        // Remove message after 3 seconds
+                        setTimeout(() => {
+                            messageDiv.remove();
+                        }, 3000);
+                    } else {
+                        // Show error message
+                        alert(data.message || 'Error updating profile');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating profile. Please try again.');
+                });
+            });
+        }
+    }
+
+    // Function to reload profile content
+    function loadProfileContent() {
+        fetch('voter_profile.php')
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Update the profile content
+                const dynamicContent = document.getElementById('dynamicContent');
+                if (dynamicContent) {
+                    dynamicContent.innerHTML = doc.body.innerHTML;
+                    handleProfileUpdate(); // Re-initialize event listeners
+                }
+            })
+            .catch(error => console.error('Error reloading profile:', error));
+    }
+
+    // Initialize the profile update functionality
+    handleProfileUpdate();
 });
 </script>
 </body>

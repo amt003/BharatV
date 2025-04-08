@@ -67,8 +67,17 @@
                         $status_stmt->bind_param("i", $election_id);
                         
                         if ($status_stmt->execute()) {
-                            $conn->commit();
-                            echo json_encode(['success' => true]);
+                            // Update results_published_date
+                            $update_date = "UPDATE elections SET results_published_date = NOW() WHERE id = ?";
+                            $date_stmt = $conn->prepare($update_date);
+                            $date_stmt->bind_param("i", $election_id);
+                            
+                            if ($date_stmt->execute()) {
+                                $conn->commit();
+                                echo json_encode(['success' => true]);
+                            } else {
+                                throw new Exception("Failed to update results published date");
+                            }
                         } else {
                             throw new Exception("Failed to update election status");
                         }

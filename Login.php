@@ -117,7 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         .header {
-            background: linear-gradient(135deg, #f5f7fa 100%);
+            background: linear-gradient(135deg,white 100%);
             padding: 15px;
             display: flex;
             justify-content: center;
@@ -217,18 +217,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .registration-link a {
             color: green;
             text-decoration: none;
+            font-weight: 500; /* Makes the text slightly bolder */
+            transition: color 0.3s ease;
         }
 
         .registration-link a:hover {
-            text-decoration: underline;
+            color: #1B5E20;
         }
 
         .forgot-password-link {
             text-align: center;
-            padding-top:10px;
-            color:green;
-          
+            padding-top:15px;
         }
+        
+        .forgot-password-link a {
+            color: #2E7D32; /* Changed to a deeper green color */
+            text-decoration: none; /* Removes the underline */
+            font-weight: 500; /* Makes the text slightly bolder */
+            transition: color 0.3s ease; /* Smooth transition for hover effect */
+        }
+        
+        .forgot-password-link a:hover {
+            color: #1B5E20; /* Darker green on hover */
+        }
+
         @keyframes fadeIn {
     from {
         opacity: 0;

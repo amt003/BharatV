@@ -60,15 +60,23 @@ $elections_result = $conn->query($elections_query);
 </div>
 
 <script>
+// This function needs to be called when the page is loaded dynamically
 function initManageCandidates() {
+    console.log("Initializing manage candidates...");
     const electionsContainer = document.getElementById('electionsListContainer');
     const candidatesContainer = document.getElementById('candidatesContainer');
     const backButton = document.getElementById('backToCandidatesBtn');
+
+    if (!electionsContainer || !candidatesContainer || !backButton) {
+        console.error("Required elements not found");
+        return;
+    }
 
     // Handle view candidates button clicks
     document.querySelectorAll('.view-candidates-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const electionId = this.dataset.electionId;
+            console.log("Viewing candidates for election ID:", electionId);
             
             // Show loading state
             candidatesContainer.style.display = 'block';
@@ -78,15 +86,21 @@ function initManageCandidates() {
             electionsContainer.style.display = 'none';
             backButton.style.display = 'block';
 
-            // Fetch candidates
+            // Fetch candidates with full URL path
             fetch(`fetch_candidates.php?election_id=${electionId}`)
-                .then(response => response.text())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.text();
+                })
                 .then(html => {
+                    console.log("Received candidates data");
                     candidatesContainer.innerHTML = html;
                 })
                 .catch(error => {
+                    console.error('Error fetching candidates:', error);
                     candidatesContainer.innerHTML = '<p class="error-message">Error loading candidates. Please try again.</p>';
-                    console.error('Error:', error);
                 });
         });
     });
@@ -100,7 +114,7 @@ function initManageCandidates() {
     });
 }
 
-// Initialize when loaded dynamically
+// Initialize when loaded
 initManageCandidates();
 </script>
 
