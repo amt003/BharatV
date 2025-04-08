@@ -1,22 +1,10 @@
 <?php
 
-// PostgreSQL connection details for Render
-$host = "dpg-cvqb743ipnbc73coi7a0-a"; // Render hostname
-$port = "5432";                       // PostgreSQL port
-$dbname = "bharatv";                  // Database name
-$username = "bharatv_user";           // Database username
-$password = "3pgPj89ytwCdTq3p8rGI834rXQGBfwBv";                       // Your password needs to be added here
-
-// Create PostgreSQL connection using PDO
-try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$username;password=$password";
-    $conn = new PDO($dsn);
-    
-    // Set PDO to throw exceptions on error
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Connection error: " . $e->getMessage());
-}
+$servername= "localhost";
+$username= "root";
+$password= "";
+$database="bharatv_db";
+$conn= mysqli_connect($servername,$username,$password,$database);
 
 /**
  * Send an email with fallback options
@@ -71,3 +59,4 @@ function logEmailAttempt($to, $subject, $success) {
 }
 
 ?>
+
