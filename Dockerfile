@@ -1,13 +1,13 @@
-# Use PHP 8.2 with Apache
+# Use official PHP image with Apache
 FROM php:8.2-apache
 
-# Enable Apache mod_rewrite (for clean URLs)
+# Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
-# Install PHP extensions
+# Install required PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Copy code from src/ into Apache root
+# Copy app files to Apache web root
 COPY src/ /var/www/html/
 
 # Set permissions (optional)
