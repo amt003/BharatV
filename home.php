@@ -64,19 +64,34 @@ body {
   background: #ffd699;
   color: white;
 }
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+}
 .auth-buttons button {
   font-size: 1em;
   padding: 10px 20px;
-  background: #4caf50;
-  color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
   transition: background-color 0.3s, transform 0.2s;
 }
+.auth-buttons .register {
+  background: #4caf50;
+  color: white;
+}
+.auth-buttons .admin-login {
+  background:  #4caf50;
+  color: white;
+}
 .auth-buttons button:hover {
+  transform: scale(1.05);
+}
+.auth-buttons .register:hover {
   background: #45a049;
-  transform: scale(1.1);
+}
+.auth-buttons .admin-login:hover {
+  background: #45a049;
 }
 .company-logo {
   top: 2px;
@@ -451,6 +466,7 @@ body {
         </nav>
         <div class="auth-buttons">
           <button class="register" onclick="register()">Register To Vote</button>
+          <button class="admin-login" onclick="adminLogin()">Admin Login</button>
         </div>
       </div>
     </header>
@@ -623,6 +639,10 @@ body {
 
       function register() {
         window.location.href = "register_dashboard.php";
+      }
+
+      function adminLogin() {
+        window.location.href = "loginadmin.php";
       }
     </script>
 
