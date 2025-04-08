@@ -5,7 +5,7 @@ $host = "dpg-cvqb743ipnbc73coi7a0-a"; // Render hostname
 $port = "5432";                       // PostgreSQL port
 $dbname = "bharatv";                  // Database name
 $username = "bharatv_user";           // Database username
-$password = "";                       // Your password needs to be added here
+$password = "3pgPj89ytwCdTq3p8rGI834rXQGBfwBv";                       // Your password needs to be added here
 
 // Create PostgreSQL connection using PDO
 try {
