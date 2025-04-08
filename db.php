@@ -2,20 +2,19 @@
 
 // PostgreSQL connection details for Render
 $host = "dpg-cvqb743ipnbc73coi7a0-a"; // Render hostname
-$port = "5432";                        // PostgreSQL port
+$port = "5432";                       // PostgreSQL port
 $dbname = "bharatv";                  // Database name
 $username = "bharatv_user";           // Database username
 $password = "";                       // Your password needs to be added here
 
-// Create PostgreSQL connection
+// Create PostgreSQL connection using PDO
 try {
-    $conn_string = "host=$host port=$port dbname=$dbname user=$username password=$password";
-    $conn = pg_connect($conn_string);
+    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$username;password=$password";
+    $conn = new PDO($dsn);
     
-    if (!$conn) {
-        throw new Exception("Database connection failed");
-    }
-} catch (Exception $e) {
+    // Set PDO to throw exceptions on error
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
     die("Connection error: " . $e->getMessage());
 }
 
