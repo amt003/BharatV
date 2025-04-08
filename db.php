@@ -1,10 +1,23 @@
 <?php
 
-$servername= "localhost";
-$username= "root";
-$password= "";
-$database="bharatv_db";
-$conn= mysqli_connect($servername,$username,$password,$database);
+// PostgreSQL connection details for Render
+$host = "dpg-cvqb743ipnbc73coi7a0-a"; // Render hostname
+$port = "5432";                        // PostgreSQL port
+$dbname = "bharatv";                  // Database name
+$username = "bharatv_user";           // Database username
+$password = "";                       // Your password needs to be added here
+
+// Create PostgreSQL connection
+try {
+    $conn_string = "host=$host port=$port dbname=$dbname user=$username password=$password";
+    $conn = pg_connect($conn_string);
+    
+    if (!$conn) {
+        throw new Exception("Database connection failed");
+    }
+} catch (Exception $e) {
+    die("Connection error: " . $e->getMessage());
+}
 
 /**
  * Send an email with fallback options
@@ -59,4 +72,3 @@ function logEmailAttempt($to, $subject, $success) {
 }
 
 ?>
-
