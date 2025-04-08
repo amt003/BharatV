@@ -172,7 +172,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </head>
 <body>
     <div class="header">
-       <a href="homeadmin.php">  <img src="assets/logo.jpg" alt="BharatV Logo"></a>
+       <a href="home.php">  <img src="assets/logo.jpg" alt="BharatV Logo"></a>
     </div>
 
     <div class="page-container">
